@@ -1,5 +1,5 @@
 import { taskCreateSchema } from './params'
-import { Router, Actions } from 'restrant2.ts/dist/lib/router'
+import { Router, Actions } from 'restrant2'
 
 export function routes(router: Router) {
   router.resources('/tasks', {
@@ -10,7 +10,7 @@ export function routes(router: Router) {
     },
     name: 'task',
     actions: [
-      ...Actions.standard(),
+      ...Actions.standard({ only: ['index', 'create', 'update', 'destroy'] }),
       { action: '_time', path: '/:id/_time', method: 'get' }
     ],
   })
