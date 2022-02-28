@@ -2,6 +2,7 @@ import express from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
+import fs from 'fs'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -34,12 +35,14 @@ export type ConstructOption = {
 
 export type RouteOption = {
   name: string
-  construct: ConstructOption
-  actions?: ActionDescriptor[]
+  construct?: ConstructOption
+  actions?: readonly ActionDescriptor[]
 }
 
 export interface Router {
-  resources(path: string, options: RouteOption): void
+  readonly router: express.Router
+  sub(...args: any[]): Router
+  resources(path: string, options: RouteOption): Promise<void>
 }
 
 const defaultConstructSources: Record<string, readonly ConstructSource[]> = {
@@ -255,7 +258,8 @@ const constructMiddleware = (
 export class ServerRouter implements Router {
   constructor(
     readonly router: express.Router,
-    readonly rootPath: string,
+    readonly fileRoot: string,
+    readonly httpPath: string = '/',
     readonly routerOption: ServerRouterOption = {
       inputKey: 'input',
       errorKey: 'validationError',
@@ -264,7 +268,20 @@ export class ServerRouter implements Router {
       actionPath: './actions',
       resourcePath: './resources',
     }
-  ) {}
+  ) {
+    this.router = express.Router({ mergeParams: true })
+  }
+
+  sub(...args: any[]) {
+    const subRouter = new ServerRouter(
+      this.router,
+      this.fileRoot,
+      path.join(this.httpPath, args[0]),
+      this.routerOption
+    )
+    ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
+    return subRouter
+  }
 
   async resources(rpath: string, option: RouteOption) {
     const setupDynamic = async (
@@ -272,23 +289,36 @@ export class ServerRouter implements Router {
       support: any,
       option: RouteOption
     ) => {
-      const ret = await import(path.join(this.rootPath, modulePath))
+      const ret = await import(path.join(this.fileRoot, modulePath))
       return await ret.default(support, option)
     }
 
-    const resourcePath = path.join(this.routerOption.resourcePath, rpath)
+    const resourcePath = path.join(
+      this.routerOption.resourcePath,
+      this.httpPath,
+      rpath
+    )
     const resource = await setupDynamic(
       resourcePath,
-      new ResourceSupport(this.rootPath, this.routerOption),
+      new ResourceSupport(this.fileRoot, this.routerOption),
       option
     )
 
-    const actionPath = path.join(this.routerOption.actionPath, rpath)
-    const handlers: Handlers = await setupDynamic(
-      actionPath,
-      new ActionSupport(this.rootPath, this.routerOption),
-      option
+    const actionPath = path.join(
+      this.routerOption.actionPath,
+      this.httpPath,
+      rpath
     )
+    let handlers: Handlers
+    if (fs.existsSync(actionPath)) {
+      handlers = await setupDynamic(
+        actionPath,
+        new ActionSupport(this.fileRoot, this.routerOption),
+        option
+      )
+    } else {
+      handlers = {}
+    }
 
     const actionDescriptors: readonly ActionDescriptor[] =
       option.actions || this.routerOption.actions
@@ -299,7 +329,7 @@ export class ServerRouter implements Router {
       const resourceMethod: Function | undefined = resource[actionName]
       const actionFunc: Handler | PostHandler | undefined = handlers[actionName]
       const cad: ConstructActionDescriptor | undefined =
-        option.construct[actionName]
+        option.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function
       if (!actionOverride) {
@@ -400,7 +430,7 @@ export class ServerRouter implements Router {
       routeLog(
         '%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}',
         ad.method,
-        urlPath,
+        path.join(this.httpPath, urlPath),
         actionName,
         params.length !== 1,
         actionOverride,
