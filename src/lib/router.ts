@@ -5,8 +5,10 @@ import debug from 'debug'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
+const handlerLog = log.extend('handler')
 
 export type ConstructSource = 'body'|'query'|'params'
+export type ActionName = 'build'|'edit'|'show'|'index'|'create'|'update'|'destroy'
 
 export type ActionDescriptor = {
   action: string,
@@ -44,7 +46,7 @@ const defaultConstructSources:Record<string, ReadonlyArray<ConstructSource>> = {
 }
 
 export namespace Actions {
-  const build:ActionDescriptor = { action: 'build', path: '/:id/build', method: 'get' } as const
+  const build:ActionDescriptor = { action: 'build', path: '/build', method: 'get' } as const
   const edit:ActionDescriptor = { action: 'edit', path: '/:id/edit', method: 'get' } as const
   const show:ActionDescriptor = { action: 'show', path: '/:id', method: 'get' } as const
   const index:ActionDescriptor = { action: 'index', path: '/', method: 'get' } as const
@@ -52,34 +54,47 @@ export namespace Actions {
   const update:ActionDescriptor = { action: 'update', path: '/:id', method: 'patch' } as const
   const destroy:ActionDescriptor = { action: 'destroy', path: '/:id', method: 'delete' } as const
 
-  const all: ReadonlyArray<ActionDescriptor> = [
+  const all: readonly ActionDescriptor[] = [
     build, edit, show, index, create, update, destroy
   ]
 
   export type Option = {
-    only: string[]
+    only: readonly ActionName[],
+    except?: undefined
+  } | {
+    except: readonly ActionName[],
+    only?: undefined
   }
 
-  export function standard(option?: Option): ReadonlyArray<ActionDescriptor> {
-    if(!option) { return all }
-
-    const only = option.only
-    // TODO: throw error when actions list is notfound in starndard
-    return all.filter(ad => only.includes(ad.action))
+  export function standard(option?: Option): readonly ActionDescriptor[] {
+    return applyOption(all, option)
   }
 
-  export function api(option?: Option): ReadonlyArray<ActionDescriptor> {
+  export function api(option?: Option): readonly ActionDescriptor[] {
     const actions = [show, index, create, update, destroy]
-    if(!option) { return actions }
-
-    const only = option.only
-    // TODO: throw error when actions list is notfound in starndard
-    return actions.filter(ad => only.includes(ad.action))
+    return applyOption(actions, option)
   }
 
-  export function only(actions: string[]):ActionDescriptor[] {
-    // TODO: throw error when actions list is notfound in starndard
-    return standard().filter(ad => actions.includes(ad.action))
+  function applyOption(actions: readonly ActionDescriptor[], option?: Option) {
+    if(!option) { return actions }
+    
+    if(option.only) {
+      return only(option.only, actions)
+    }
+
+    if(option.except) {
+      return except(option.except, actions)
+    }
+
+    throw new Error('unreach')
+  }
+
+  export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[] = all):ActionDescriptor[] {
+    return sources.filter(ad => actions.includes(ad.action as ActionName))
+  }
+
+  export function except(actions: readonly ActionName[], sources: readonly ActionDescriptor[] = all):ActionDescriptor[] {
+    return sources.filter(ad => !actions.includes(ad.action as ActionName))
   }
 }
 
@@ -89,7 +104,7 @@ export type Handler = (req: express.Request, res: express.Response) => void
 
 export type PostHandler = {
   success: (output: any, req: express.Request, res: express.Response) => Promise<void>,
-  invalid: (err: ValidationError, req: express.Request, res: express.Response) => Promise<void>,
+  invalid?: (err: ValidationError, req: express.Request, res: express.Response) => Promise<void>,
   fatal?:  (err: Error, req: express.Request, res: express.Response) => Promise<void>,
 }
 
@@ -108,6 +123,9 @@ type ServerRouterOption = {
   actionPath: string;
   resourcePath: string;
 }
+
+export const nullSchema = z.object({})
+export type NullParams = z.infer<typeof nullSchema>
 
 const mergeSource = (req: express.Request, sources: readonly string[]): Record<string, any> => {
   let merged = {}
@@ -183,17 +201,25 @@ export class ServerRouter implements Router {
 
       const resourceMethod:Function|undefined = resource[actionName]
       const actionFunc: Handler|PostHandler|undefined = handlers[actionName]
+      const cad:ConstructActionDescriptor|undefined = option.construct[actionName]
 
-      if(!(actionFunc instanceof Function) && resourceMethod === undefined) {
-        throw new Error(`Handler not found! define ${resourcePath}#${actionName} or/and ${actionPath}#${actionName}`)
+      const actionOverride = actionFunc instanceof Function
+      if(!actionOverride) {
+        if(resourceMethod === undefined) {
+          throw new Error(`Handler not found! define ${resourcePath}#${actionName} or/and ${actionPath}#${actionName}`)
+        }
       }
 
-      const cad:ConstructActionDescriptor|undefined = option.construct[actionName]
+      if(actionOverride && resourceMethod) {
+        routeLog.extend('warn')(`${resourcePath}#${actionName} is defined but will not be called auto. PostHandler support auto call`)
+      }
+
       const defaultSources = defaultConstructSources[actionName] || ['params']
 
       const handler: express.Handler = async (req, res, next) => {
         if(actionFunc instanceof Function) {
           try {
+            handlerLog('%s#%s as Handler', actionPath, actionName)
             await actionFunc(req, res)
           } catch(err) {
             next(err)
@@ -204,29 +230,39 @@ export class ServerRouter implements Router {
         try {
           const validationError = (req as any).validationError
           if(validationError) { 
+            handlerLog('%s#%s validationError %s', actionPath, actionName, validationError.message)
             if(actionFunc) {
-              res.status(422)
-              await actionFunc.invalid(validationError, req, res)
+              if(actionFunc.invalid) {
+                handlerLog('%s#%s.invalid', actionPath, actionName)
+                res.status(422)
+                await actionFunc.invalid(validationError, req, res)
+              } else {
+                next(validationError)
+              }
             } else {
+              handlerLog('%s#%s invalid as json', actionPath, actionName)
               res.status(422)
               res.json({ status: 'error', errors: validationError.errors, message: validationError.message } )        
             }
             return
           }
           
-          const input = (req as any).input || mergeSource(req, defaultSources)
+          const input = (req as any).input
           const output = await resourceMethod!.call(resource, input)
           if(actionFunc) {
+            handlerLog('%s#%s.success', actionPath, actionName)
             await actionFunc.success(output, req, res)
           } else {
+            handlerLog('%s#%s success as json', actionPath, actionName)
             res.json({ status: 'success', data: output })
           }
         } catch (err) {
-          if(!actionFunc.fatal) { 
+          if(!actionFunc?.fatal) { 
             return next(err)
           }
 
           try {
+            handlerLog('%s#%s.fatal', actionPath, actionName)
             await actionFunc.fatal(err as Error, req, res)
           } catch (er) {
             next(er)
@@ -236,11 +272,12 @@ export class ServerRouter implements Router {
 
       let params
       const urlPath = path.join(rpath, ad.path)
-      if(cad && cad.schema) {
+      if(resourceMethod) {
+        const schema = cad?.schema || nullSchema
         params = [
           constructMiddleware(
-            cad.schema, 
-            cad.sources || defaultSources, 
+            schema, 
+            cad?.sources || defaultSources, 
             this.routerOption
           ), 
           handler
@@ -248,8 +285,10 @@ export class ServerRouter implements Router {
       } else {
         params = [handler]
       }
-      
-      routeLog('%s\t%s\t%s', ad.method, urlPath, actionName);
+
+      routeLog('%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}', 
+        ad.method, urlPath, actionName, params.length !== 1, actionOverride, !!resourceMethod
+      );
 
       (this.router as any)[ad.method].apply(this.router, [urlPath, ...params])
     }

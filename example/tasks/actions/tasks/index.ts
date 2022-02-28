@@ -1,22 +1,46 @@
-import { Handler, PostHandler, defineActions } from 'restrant2'
+import { defineActions } from 'restrant2'
 
 export default defineActions((support, options) => {
-  const _time: Handler = (req, res) => {
-    res.json({ id: req.params.id, time: new Date() })
-  }
 
-  const create: PostHandler = {
-    success: async (output, req, res) => { 
-      res.redirect('/tasks')
+  return { 
+    index: {
+      success: async (output, req, res) => res.render('tasks/index', { tasks: output })
     }, 
-    invalid: async (err, req, res) => { 
-      res.render('tasks/build', { body: req.body, err }) 
+
+    build: (req, res) => res.render('tasks/build', { task: {} }), 
+
+    edit: {
+      success: async (output, req, res) => res.render('tasks/edit', { task: output }), 
+    },
+    
+    create: {
+      success: async (output, req, res) => { 
+        res.redirect('/tasks')
+      }, 
+      invalid: async (err, req, res) => { 
+        res.render('tasks/build', { task: req.body, err }) 
+      }
+    }, 
+
+    update: {
+      success: async(output, req, res) => {
+        res.redirect('/tasks')
+      },
+      invalid: async(err, req, res) => {
+        res.render('tasks/edit', { task: req.body, err })
+      }
+    }, 
+
+    destroy: {
+      success: async (output, req, res) => {
+        res.redirect('/tasks')
+      }, 
+    },
+
+    done: {
+      success: async (output, req, res) => {
+        res.redirect('/tasks')
+      }
     }
   }
-
-  const update = () => {}
-
-  const destroy = () => {}
-
-  return { create, update, destroy, _time };
 })

@@ -1,17 +1,19 @@
-import { taskCreateSchema } from './params'
+import { idSchema, taskCreateSchema, taskUpdateSchema } from './params'
 import { Router, Actions } from 'restrant2'
 
 export function routes(router: Router) {
   router.resources('/tasks', {
     construct: {
-      create: {
-        schema: taskCreateSchema
-      }
+      create: { schema: taskCreateSchema },
+      edit: { schema: idSchema },
+      update: { schema: taskUpdateSchema },
+      destroy: { schema: idSchema },
+      done: { schema: idSchema }
     },
     name: 'task',
     actions: [
-      ...Actions.standard({ only: ['index', 'create', 'update', 'destroy'] }),
-      { action: '_time', path: '/:id/_time', method: 'get' }
+      ...Actions.standard({ except: ['show'] }),
+      { action: 'done', path: '/:id/done', method: 'post' }
     ],
   })
 }
