@@ -2,21 +2,13 @@ import express from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
-import fs from 'fs'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
 const handlerLog = log.extend('handler')
 
 export type ConstructSource = 'body' | 'query' | 'params'
-export type ActionName =
-  | 'build'
-  | 'edit'
-  | 'show'
-  | 'index'
-  | 'create'
-  | 'update'
-  | 'destroy'
+export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 
 export type ActionDescriptor = {
   action: string
@@ -92,15 +84,7 @@ export namespace Actions {
     method: 'delete',
   } as const
 
-  const all: readonly ActionDescriptor[] = [
-    build,
-    edit,
-    show,
-    index,
-    create,
-    update,
-    destroy,
-  ]
+  const all: readonly ActionDescriptor[] = [build, edit, show, index, create, update, destroy]
 
   export type Option =
     | {
@@ -134,13 +118,10 @@ export namespace Actions {
       return except(option.except, actions)
     }
 
-    throw new Error('Unreachable!')
+    throw new RouterError('Unreachable!')
   }
 
-  export function only(
-    actions: readonly ActionName[],
-    sources: readonly ActionDescriptor[] = all
-  ): ActionDescriptor[] {
+  export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[] = all): ActionDescriptor[] {
     return sources.filter((ad) => actions.includes(ad.action as ActionName))
   }
 
@@ -157,21 +138,9 @@ export type ValidationError = z.ZodError
 export type Handler = (req: express.Request, res: express.Response) => void
 
 export type PostHandler = {
-  success: (
-    output: any,
-    req: express.Request,
-    res: express.Response
-  ) => Promise<void>
-  invalid?: (
-    err: ValidationError,
-    req: express.Request,
-    res: express.Response
-  ) => Promise<void>
-  fatal?: (
-    err: Error,
-    req: express.Request,
-    res: express.Response
-  ) => Promise<void>
+  success: (output: any, req: express.Request, res: express.Response) => Promise<void>
+  invalid?: (err: ValidationError, req: express.Request, res: express.Response) => Promise<void>
+  fatal?: (err: Error, req: express.Request, res: express.Response) => Promise<void>
 }
 
 export type Handlers = {
@@ -190,17 +159,16 @@ type ServerRouterOption = {
   errorKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  actionPath: string
-  resourcePath: string
+  actionRoot: string
+  actionFileName: string
+  resourceRoot: string
+  resourceFileName: string
 }
 
-export const nullSchema = z.object({})
-export type NullParams = z.infer<typeof nullSchema>
+export const blankSchema = z.object({})
+export type BlankParams = z.infer<typeof blankSchema>
 
-const mergeSource = (
-  req: express.Request,
-  sources: readonly string[]
-): Record<string, any> => {
+const mergeSource = (req: express.Request, sources: readonly string[]): Record<string, any> => {
   let merged = {}
   const record = req as Record<string, any>
   for (const source of sources) {
@@ -229,17 +197,8 @@ const constructMiddleware = (
   sources: readonly string[],
   routerOption: ServerRouterOption
 ) => {
-  return (
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    const body = routerOption.inputArranger(
-      mergeSource(req, sources),
-      schema,
-      req,
-      res
-    )
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const body = routerOption.inputArranger(mergeSource(req, sources), schema, req, res)
     try {
       const input = schema.parse(body)
       ;(req as any)[routerOption.inputKey] = input
@@ -255,9 +214,12 @@ const constructMiddleware = (
   }
 }
 
+class RouterError extends Error {}
+
 export class ServerRouter implements Router {
+  readonly router: express.Router
+
   constructor(
-    readonly router: express.Router,
     readonly fileRoot: string,
     readonly httpPath: string = '/',
     readonly routerOption: ServerRouterOption = {
@@ -265,76 +227,79 @@ export class ServerRouter implements Router {
       errorKey: 'validationError',
       actions: Actions.standard(),
       inputArranger: smartInputArranger,
-      actionPath: './actions',
-      resourcePath: './resources',
+      actionRoot: './endpoint',
+      actionFileName: 'handlers',
+      resourceRoot: './endpoint',
+      resourceFileName: 'resource',
     }
   ) {
     this.router = express.Router({ mergeParams: true })
   }
 
   sub(...args: any[]) {
-    const subRouter = new ServerRouter(
-      this.router,
-      this.fileRoot,
-      path.join(this.httpPath, args[0]),
-      this.routerOption
-    )
+    const subRouter = new ServerRouter(this.fileRoot, path.join(this.httpPath, args[0]), this.routerOption)
     ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
     return subRouter
   }
 
   async resources(rpath: string, option: RouteOption) {
-    const setupDynamic = async (
-      modulePath: string,
-      support: any,
-      option: RouteOption
-    ) => {
-      const ret = await import(path.join(this.fileRoot, modulePath))
-      return await ret.default(support, option)
+    const setupDynamic = async (modulePath: string, support: any, option: RouteOption) => {
+      let ret
+      try {
+        ret = await import(path.join(this.fileRoot, modulePath))
+      } catch (err) {
+        const error = err as any
+        if (error.code === 'MODULE_NOT_FOUND') {
+          routeLog.extend('debug')('%s not found', actionPath)
+          return {}
+        } else {
+          throw err
+        }
+      }
+
+      try {
+        return await ret.default(support, option)
+      } catch (err) {
+        if (err instanceof Error) {
+          // for Error 2nd argument type
+          // @ts-ignore
+          throw new RouterError(`Error occured "${err.message}" on calling default function "${modulePath}"`, {
+            cause: err,
+          })
+        } else {
+          throw new TypeError(`Unexpected Error Object: ${err}`)
+        }
+      }
     }
 
     const resourcePath = path.join(
-      this.routerOption.resourcePath,
+      this.routerOption.resourceRoot,
       this.httpPath,
-      rpath
+      rpath,
+      this.routerOption.resourceFileName
     )
-    const resource = await setupDynamic(
-      resourcePath,
-      new ResourceSupport(this.fileRoot, this.routerOption),
+    const resource = await setupDynamic(resourcePath, new ResourceSupport(this.fileRoot, this.routerOption), option)
+
+    const actionPath = path.join(this.routerOption.actionRoot, this.httpPath, rpath, this.routerOption.actionFileName)
+    const handlers: Handlers = await setupDynamic(
+      actionPath,
+      new ActionSupport(this.fileRoot, this.routerOption),
       option
     )
 
-    const actionPath = path.join(
-      this.routerOption.actionPath,
-      this.httpPath,
-      rpath
-    )
-    let handlers: Handlers
-    if (fs.existsSync(actionPath)) {
-      handlers = await setupDynamic(
-        actionPath,
-        new ActionSupport(this.fileRoot, this.routerOption),
-        option
-      )
-    } else {
-      handlers = {}
-    }
-
-    const actionDescriptors: readonly ActionDescriptor[] =
-      option.actions || this.routerOption.actions
+    const actionDescriptors: readonly ActionDescriptor[] = option.actions || this.routerOption.actions
 
     for (const ad of actionDescriptors) {
       const actionName = ad.action
 
       const resourceMethod: Function | undefined = resource[actionName]
       const actionFunc: Handler | PostHandler | undefined = handlers[actionName]
-      const cad: ConstructActionDescriptor | undefined =
-        option.construct?.[actionName]
+      const cad: ConstructActionDescriptor | undefined = option.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function
       if (!actionOverride) {
         if (resourceMethod === undefined) {
-          throw new Error(
+          throw new RouterError(
             `Handler not found! define ${resourcePath}#${actionName} or/and ${actionPath}#${actionName}`
           )
         }
@@ -362,12 +327,7 @@ export class ServerRouter implements Router {
         try {
           const validationError = (req as any).validationError
           if (validationError) {
-            handlerLog(
-              '%s#%s validationError %s',
-              actionPath,
-              actionName,
-              validationError.message
-            )
+            handlerLog('%s#%s validationError %s', actionPath, actionName, validationError.message)
             if (actionFunc) {
               if (actionFunc.invalid) {
                 handlerLog('%s#%s.invalid', actionPath, actionName)
@@ -414,15 +374,8 @@ export class ServerRouter implements Router {
       let params
       const urlPath = path.join(rpath, ad.path)
       if (resourceMethod) {
-        const schema = cad?.schema || nullSchema
-        params = [
-          constructMiddleware(
-            schema,
-            cad?.sources || defaultSources,
-            this.routerOption
-          ),
-          handler,
-        ]
+        const schema = cad?.schema || blankSchema
+        params = [constructMiddleware(schema, cad?.sources || defaultSources, this.routerOption), handler]
       } else {
         params = [handler]
       }
@@ -442,10 +395,7 @@ export class ServerRouter implements Router {
 }
 
 export class ActionSupport {
-  constructor(
-    readonly rootPath: string,
-    readonly routerOption: ServerRouterOption
-  ) {}
+  constructor(readonly rootPath: string, readonly routerOption: ServerRouterOption) {}
 
   input(req: express.Request): any {
     return (req as any)[this.routerOption.inputKey]
@@ -457,23 +407,13 @@ export class ActionSupport {
 }
 
 export class ResourceSupport {
-  constructor(
-    readonly rootPath: string,
-    readonly routerOption: ServerRouterOption
-  ) {}
+  constructor(readonly rootPath: string, readonly routerOption: ServerRouterOption) {}
 }
 
-export function defineResource(
-  callback: (
-    support: ResourceSupport,
-    options: RouteOption
-  ) => Record<string, Function>
-) {
+export function defineResource(callback: (support: ResourceSupport, options: RouteOption) => Record<string, Function>) {
   return callback
 }
 
-export function defineActions(
-  callback: (support: ActionSupport, options: RouteOption) => Handlers
-) {
+export function defineActions(callback: (support: ActionSupport, options: RouteOption) => Handlers) {
   return callback
 }

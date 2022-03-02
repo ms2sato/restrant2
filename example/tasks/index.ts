@@ -3,6 +3,7 @@ import { Router, ServerRouter } from 'restrant2'
 import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
+import displayRoutes from 'express-routemap'
 
 const debug = createDebug('tasks:params')
 const app = express()
@@ -36,10 +37,9 @@ app.use((req, res, next) => {
   }
 })
 
-const router: Router = new ServerRouter(app, __dirname)
+const router: Router = new ServerRouter(__dirname)
 app.use(router.router)
 routes(router).then(() => {
-  const displayRoutes = require('express-routemap')
   displayRoutes(app)
 
   app.listen(3000, () => {

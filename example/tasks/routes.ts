@@ -11,10 +11,7 @@ export async function routes(router: Router) {
       done: { schema: idSchema },
     },
     name: 'task',
-    actions: [
-      ...Actions.standard({ except: ['show'] }),
-      { action: 'done', path: '/:id/done', method: 'post' },
-    ],
+    actions: [...Actions.standard({ except: ['show'] }), { action: 'done', path: '/:id/done', method: 'post' }],
   })
 
   const adminRouter = router.sub('/admins/:adminId')
