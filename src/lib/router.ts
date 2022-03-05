@@ -250,7 +250,7 @@ export class ServerRouter implements Router {
       } catch (err) {
         const error = err as any
         if (error.code === 'MODULE_NOT_FOUND') {
-          routeLog.extend('debug')('%s not found', actionPath)
+          routeLog.extend('debug')('%s not found', modulePath)
           return {}
         } else {
           throw err
@@ -263,7 +263,7 @@ export class ServerRouter implements Router {
         if (err instanceof Error) {
           // for Error 2nd argument type
           // @ts-ignore
-          throw new RouterError(`Error occured "${err.message}" on calling default function "${modulePath}"`, {
+          throw new RouterError(`Error occured "${err.message}" on calling default function in "${modulePath}"`, {
             cause: err,
           })
         } else {
