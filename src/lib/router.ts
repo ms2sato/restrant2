@@ -17,7 +17,7 @@ export type ActionDescriptor = {
 }
 
 export type ConstructActionDescriptor = {
-  schema?: z.ZodObject<any>
+  schema?: z.AnyZodObject
   sources?: readonly ConstructSource[]
 }
 

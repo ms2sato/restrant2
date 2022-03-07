@@ -22,6 +22,7 @@
     "@types/method-override": "^0.0.32",
     "express-routemap": "^1.6.0",
     "nodemon": "^2.0.15",
-    "ts-node": "^10.5.0"
+    "ts-node": "^10.5.0",
+    "typescript": "^4.6.2"
   }
 }
