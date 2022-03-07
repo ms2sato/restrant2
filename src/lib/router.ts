@@ -3,6 +3,8 @@ import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
 
+export { z }
+
 const log = debug('restrant2')
 const routeLog = log.extend('route')
 const handlerLog = log.extend('handler')
@@ -243,7 +245,7 @@ export class ServerRouter implements Router {
   }
 
   async resources(rpath: string, option: RouteOption) {
-    const setupDynamic = async (modulePath: string, support: any, option: RouteOption) => {
+    const setupDynamic = async (modulePath: string, support: ResourceSupport | ActionSupport, option: RouteOption) => {
       let ret
       try {
         ret = await import(path.join(this.fileRoot, modulePath))
@@ -414,6 +416,6 @@ export function defineResource(callback: (support: ResourceSupport, options: Rou
   return callback
 }
 
-export function defineActions(callback: (support: ActionSupport, options: RouteOption) => Handlers) {
+export function defineHandlers(callback: (support: ActionSupport, options: RouteOption) => Handlers) {
   return callback
 }

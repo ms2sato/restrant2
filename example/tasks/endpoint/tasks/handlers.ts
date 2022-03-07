@@ -1,46 +1,45 @@
-import { defineActions } from 'restrant2'
+import { defineHandlers } from 'restrant2'
 
-export default defineActions((support, options) => {
-
-  return { 
+export default defineHandlers((support, options) => {
+  return {
     index: {
-      success: async (output, req, res) => res.render('tasks/index', { tasks: output })
-    }, 
+      success: async (output, req, res) => res.render('tasks/index', { tasks: output }),
+    },
 
-    build: (req, res) => res.render('tasks/build', { task: {} }), 
+    build: (req, res) => res.render('tasks/build', { task: {} }),
 
     edit: {
-      success: async (output, req, res) => res.render('tasks/edit', { task: output }), 
+      success: async (output, req, res) => res.render('tasks/edit', { task: output }),
     },
-    
-    create: {
-      success: async (output, req, res) => { 
-        res.redirect('/tasks')
-      }, 
-      invalid: async (err, req, res) => { 
-        res.render('tasks/build', { task: req.body, err }) 
-      }
-    }, 
 
-    update: {
-      success: async(output, req, res) => {
+    create: {
+      success: async (output, req, res) => {
         res.redirect('/tasks')
       },
-      invalid: async(err, req, res) => {
+      invalid: async (err, req, res) => {
+        res.render('tasks/build', { task: req.body, err })
+      },
+    },
+
+    update: {
+      success: async (output, req, res) => {
+        res.redirect('/tasks')
+      },
+      invalid: async (err, req, res) => {
         res.render('tasks/edit', { task: req.body, err })
-      }
-    }, 
+      },
+    },
 
     destroy: {
       success: async (output, req, res) => {
         res.redirect('/tasks')
-      }, 
+      },
     },
 
     done: {
       success: async (output, req, res) => {
         res.redirect('/tasks')
-      }
-    }
+      },
+    },
   }
 })
