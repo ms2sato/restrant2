@@ -1,5 +1,5 @@
 import express from 'express'
-import { Router, ServerRouter } from 'restrant2'
+import { ServerRouter } from 'restrant2'
 import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
@@ -37,7 +37,7 @@ app.use((req, res, next) => {
   }
 })
 
-const router: Router = new ServerRouter(__dirname)
+const router: ServerRouter = new ServerRouter(__dirname)
 app.use(router.router)
 routes(router).then(() => {
   displayRoutes(app)
