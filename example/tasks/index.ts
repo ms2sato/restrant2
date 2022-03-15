@@ -1,5 +1,5 @@
 import express from 'express'
-import { ServerRouter } from 'restrant2'
+import { ServerRouter, ActionDescriptor } from 'restrant2'
 import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
@@ -37,12 +37,35 @@ app.use((req, res, next) => {
   }
 })
 
-const router: ServerRouter = new ServerRouter(__dirname)
+const createResourceMethodOptions = (
+  req: express.Request,
+  res: express.Response,
+  httpPath: string,
+  ad: ActionDescriptor
+) => {
+  debug('createResourceMethodOptions: %s', req.params)
+  if (req.params.adminId) {
+    return [
+      {
+        admin: {
+          id: Number(req.params.adminId),
+          accessedAt: new Date(),
+        },
+      },
+    ]
+  }
+  return []
+}
+
+const router: ServerRouter = new ServerRouter(__dirname, '/', {
+  createResourceMethodOptions,
+})
 app.use(router.router)
 routes(router).then(() => {
   displayRoutes(app)
 
-  app.listen(3000, () => {
-    console.log('REST API server ready at: http://localhost:3000')
+  const port = 3000
+  app.listen(port, () => {
+    console.log(`REST API server ready at: http://localhost:${port}`)
   })
 })

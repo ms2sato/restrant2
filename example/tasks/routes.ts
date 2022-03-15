@@ -1,4 +1,4 @@
-import { idSchema, taskCreateSchema, taskUpdateSchema } from './params'
+import { idSchema, taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
 import { Router, Actions } from 'restrant2'
 
 export async function routes(router: Router) {

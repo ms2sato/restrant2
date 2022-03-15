@@ -31,8 +31,8 @@ const defaultConstructSources: Record<string, readonly ConstructSource[]> = {
   edit: ['params'],
   show: ['params'],
   index: ['params'],
-  create: ['body', 'params'],
-  update: ['body', 'params'],
+  create: ['body', 'files', 'params'],
+  update: ['body', 'files', 'params'],
   destroy: ['params'],
 }
 
@@ -69,6 +69,7 @@ const constructMiddleware = (
     const body = routerOption.inputArranger(mergeSource(req, sources), schema, req, res)
     try {
       const input = schema.parse(body)
+      routeLog('input', input)
       ;(req as any)[routerOption.inputKey] = input
       next()
     } catch (err) {
@@ -80,6 +81,15 @@ const constructMiddleware = (
       }
     }
   }
+}
+
+const createNullResourceMethodOptions = (
+  req: express.Request,
+  res: express.Response,
+  httpPath: string,
+  ad: ActionDescriptor
+) => {
+  return []
 }
 
 export const importAndSetup = async (
@@ -123,6 +133,7 @@ function defaultServerRouterOption(): ServerRouterOption {
     errorKey: 'validationError',
     actions: Actions.standard(),
     inputArranger: smartInputArranger,
+    createResourceMethodOptions: createNullResourceMethodOptions,
     actionRoot: './endpoint',
     handlersFileName: 'handlers',
     resourceRoot: './endpoint',
@@ -131,32 +142,36 @@ function defaultServerRouterOption(): ServerRouterOption {
 }
 
 export abstract class BasicRouter implements Router {
+  protected readonly routerOption: ServerRouterOption
+
   constructor(
     readonly fileRoot: string,
     readonly httpPath: string = '/',
-    readonly routerOption: ServerRouterOption = defaultServerRouterOption()
-  ) {}
+    routerOption: Partial<ServerRouterOption> = {}
+  ) {
+    this.routerOption = Object.assign(defaultServerRouterOption(), routerOption)
+  }
 
   abstract sub(...args: any[]): Router
   abstract resources(rpath: string, option: RouteOption): Promise<void>
 
+  protected getHttpPath(rpath: string) {
+    return path.join(this.httpPath, rpath)
+  }
+
   protected getResourcePath(rpath: string) {
-    return path.join(this.routerOption.resourceRoot, this.httpPath, rpath, this.routerOption.resourceFileName)
+    return path.join(this.routerOption.resourceRoot, this.getHttpPath(rpath), this.routerOption.resourceFileName)
   }
 
   protected getHandlersPath(rpath: string) {
-    return path.join(this.routerOption.actionRoot, this.httpPath, rpath, this.routerOption.handlersFileName)
+    return path.join(this.routerOption.actionRoot, this.getHttpPath(rpath), this.routerOption.handlersFileName)
   }
 }
 
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
-  constructor(
-    fileRoot: string,
-    httpPath: string = '/',
-    routerOption: ServerRouterOption = defaultServerRouterOption()
-  ) {
+  constructor(fileRoot: string, httpPath: string = '/', routerOption: Partial<ServerRouterOption> = {}) {
     super(fileRoot, httpPath, routerOption)
     this.router = express.Router({ mergeParams: true })
   }
@@ -245,8 +260,12 @@ export class ServerRouter extends BasicRouter {
             return
           }
 
+          const options = this.routerOption.createResourceMethodOptions(req, res, this.getHttpPath(rpath), ad)
           const input = (req as any).input
-          const output = await resourceMethod!.call(resource, input)
+          const args = input ? [input, ...options] : options
+          handlerLog('resourceMethod args: %o', args)
+          const output = await resourceMethod!.apply(resource, args)
+
           if (actionFunc) {
             handlerLog('%s#%s.success', handlersPath, actionName)
             await actionFunc.success(output, req, res)
@@ -270,9 +289,8 @@ export class ServerRouter extends BasicRouter {
 
       let params
       const urlPath = path.join(rpath, ad.path)
-      if (resourceMethod) {
-        const schema = cad?.schema || blankSchema
-        params = [constructMiddleware(schema, cad?.sources || defaultSources, this.routerOption), handler]
+      if (resourceMethod && cad?.schema) {
+        params = [constructMiddleware(cad.schema, cad.sources || defaultSources, this.routerOption), handler]
       } else {
         params = [handler]
       }
@@ -296,7 +314,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     private resourcesHolder: any,
     fileRoot: string,
     httpPath: string = '/',
-    routerOption: ServerRouterOption = defaultServerRouterOption()
+    routerOption: Partial<ServerRouterOption> = {}
   ) {
     super(fileRoot, httpPath, routerOption)
   }
@@ -312,24 +330,21 @@ export class ResourceHolderCreateRouter extends BasicRouter {
 
   async resources(rpath: string, option: RouteOption) {
     const resourcePath = this.getResourcePath(rpath)
-    const resource = await importAndSetup(
-      this.fileRoot,
-      resourcePath,
-      new ResourceSupport(this.fileRoot, this.routerOption),
-      option
-    )
+    const resourceSupport = new ResourceSupport(this.fileRoot, this.routerOption)
+    const resource = await importAndSetup(this.fileRoot, resourcePath, resourceSupport, option)
 
     const resourceProxy: Record<string, Function> = {}
     for (let actionName in resource) {
       const resourceMethod = resource[actionName]
       const cad: ConstructActionDescriptor | undefined = option.construct?.[actionName]
       if (cad?.schema) {
-        resourceProxy[actionName] = function (input: any) {
-          return resourceMethod(cad.schema?.parse(input))
+        resourceProxy[actionName] = function () {
+          const [input, ...options] = Array.from(arguments)
+          return resourceMethod.apply(resource, cad.schema?.parse(input), options)
         }
       } else {
         resourceProxy[actionName] = function () {
-          return resourceMethod()
+          return resourceMethod.apply(resource, arguments)
         }
       }
 

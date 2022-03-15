@@ -22,3 +22,20 @@ export const taskUpdateSchema = z.object({
 })
 
 export type TaskUpdateParams = z.infer<typeof taskUpdateSchema>
+
+
+const userCoreProps = {
+  name: z.string().min(3).max(255),
+  photo: z.string().min(3).max(4096).optional(),
+}
+
+export const userCreateSchema = z.object(userCoreProps)
+
+export type UserCreateParams = z.infer<typeof userCreateSchema>
+
+export const userUpdateSchema = z.object({
+  id: z.number(),
+  ...userCoreProps,
+})
+
+export type UserUpdateParams = z.infer<typeof userUpdateSchema>

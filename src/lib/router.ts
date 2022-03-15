@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export { z }
 
-export type ConstructSource = 'body' | 'query' | 'params'
+export type ConstructSource = 'body' | 'query' | 'params' | 'files'
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 
 export type ActionDescriptor = {
@@ -134,11 +134,16 @@ export type Handlers = {
 
 export class RouterError extends Error {}
 
+export type CreateResourceMethodArguments = {
+  (req: express.Request, res: express.Response, httpPath: string, ad: ActionDescriptor): any[]
+}
+
 export type ServerRouterOption = {
   inputKey: string
   errorKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
+  createResourceMethodOptions: CreateResourceMethodArguments
   actionRoot: string
   handlersFileName: string
   resourceRoot: string
@@ -175,4 +180,3 @@ export function defineResource(callback: (support: ResourceSupport, options: Rou
 export function defineHandlers(callback: (support: ActionSupport, options: RouteOption) => Handlers) {
   return callback
 }
-
