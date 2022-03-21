@@ -12,13 +12,13 @@ export type ActionDescriptor = {
   method: 'get' | 'post' | 'put' | 'patch' | 'delete'
 }
 
-export type ConstructActionDescriptor = {
+export type ConstructDescriptor = {
   schema?: z.AnyZodObject
   sources?: readonly ConstructSource[]
 }
 
 export type ConstructConfig = {
-  [key: string]: ConstructActionDescriptor
+  [key: string]: ConstructDescriptor
 }
 
 export type RouteConfig = {

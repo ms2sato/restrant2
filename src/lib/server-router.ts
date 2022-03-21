@@ -7,7 +7,7 @@ import {
   ActionDescriptor,
   Actions,
   ActionSupport,
-  ConstructActionDescriptor,
+  ConstructDescriptor,
   ConstructSource,
   CreateOptionsFunction,
   Handler,
@@ -203,7 +203,7 @@ export class ServerRouter extends BasicRouter {
 
       const resourceMethod: Function | undefined = resource[actionName]
       const actionFunc: Handler | PostHandler | undefined = handlers[actionName]
-      const cad: ConstructActionDescriptor | undefined = config.construct?.[actionName]
+      const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function
       if (!actionOverride) {
@@ -339,7 +339,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     const resourceProxy: Record<string, Function> = {}
     for (let actionName in resource) {
       const resourceMethod = resource[actionName]
-      const cad: ConstructActionDescriptor | undefined = config.construct?.[actionName]
+      const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
       if (cad?.schema) {
         resourceProxy[actionName] = function () {
           const [input, ...options] = Array.from(arguments)
