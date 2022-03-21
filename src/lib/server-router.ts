@@ -85,7 +85,7 @@ const constructMiddleware = (
   }
 }
 
-const createNullOptions: CreateOptionsFunction = (req, res, httpPath, ad) => {
+const createNullOptions: CreateOptionsFunction = async (req, res, httpPath, ad) => {
   return []
 }
 
@@ -235,7 +235,7 @@ export class ServerRouter extends BasicRouter {
           return
         }
 
-        const options = this.routerConfig.createOptions(req, res, this.getHttpPath(rpath), ad)
+        const options = await this.routerConfig.createOptions(req, res, this.getHttpPath(rpath), ad)
 
         try {
           const validationError = (req as any).validationError

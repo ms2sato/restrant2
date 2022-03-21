@@ -149,7 +149,7 @@ export type Handlers2<O> = {
 export class RouterError extends Error {}
 
 export type CreateOptionsFunction = {
-  (req: express.Request, res: express.Response, httpPath: string, ad: ActionDescriptor): any[]
+  (req: express.Request, res: express.Response, httpPath: string, ad: ActionDescriptor): Promise<any[]>
 }
 
 export type ServerRouterConfig = {
