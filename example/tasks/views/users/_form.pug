@@ -8,12 +8,12 @@ mixin form(action, method)
             div=error.path.join('.')
             div=error.message
 
-  form(action=action, method="post")
+  form(action=action, method="post", enctype="multipart/form-data")
     input(type="hidden", name="_method", value=method)
     
     div
-      input(name="title", value=task.title)
+      input(name="name", value=data.name)
     div  
-      textarea(name="description")=task.description
+      input(name="photo", type="file", value=data.photo)
     div  
       input(type="submit")

@@ -1,5 +1,6 @@
 import { IdParams, UserCreateParams, UserUpdateParams } from '../../../../params'
 import { defineResource } from 'restrant2'
+import { AcceptLanguageOption } from '../../../../endpoint_options'
 
 export type User = {
   id: number
@@ -24,7 +25,7 @@ export default defineResource((support, options) => {
   }
 
   return {
-    index: (option: any) => {
+    index: (option: AcceptLanguageOption) => {
       console.log(users)
       console.log(option)
       return Array.from(users, ([id, data]) => data)

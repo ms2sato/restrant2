@@ -1,44 +1,44 @@
 import { defineHandlers } from 'restrant2'
 
-export default defineHandlers((support, options) => {
+export default defineHandlers((support, routeConfig) => {
   return {
     index: {
-      success: async (output, req, res) => res.render('tasks/index', { tasks: output }),
+      success: async (ctx, output) => ctx.res.render('tasks/index', { tasks: output }),
     },
 
-    build: (req, res) => res.render('tasks/build', { task: {} }),
+    build: (ctx) => ctx.res.render('tasks/build', { task: {} }),
 
     edit: {
-      success: async (output, req, res) => res.render('tasks/edit', { task: output }),
+      success: async (ctx, output) => ctx.res.render('tasks/edit', { task: output }),
     },
 
     create: {
-      success: async (output, req, res) => {
-        res.redirect('/tasks')
+      success: async (ctx, output) => {
+        ctx.res.redirect('/tasks')
       },
-      invalid: async (err, req, res) => {
-        res.render('tasks/build', { task: req.body, err })
+      invalid: async (ctx, err) => {
+        ctx.res.render('tasks/build', { task: ctx.req.body, err })
       },
     },
 
     update: {
-      success: async (output, req, res) => {
-        res.redirect('/tasks')
+      success: async (ctx, output) => {
+        ctx.res.redirect('/tasks')
       },
-      invalid: async (err, req, res) => {
-        res.render('tasks/edit', { task: req.body, err })
+      invalid: async (ctx, err) => {
+        ctx.res.render('tasks/edit', { task: ctx.req.body, err })
       },
     },
 
     destroy: {
-      success: async (output, req, res) => {
-        res.redirect('/tasks')
+      success: async (ctx, output) => {
+        ctx.res.redirect('/tasks')
       },
     },
 
     done: {
-      success: async (output, req, res) => {
-        res.redirect('/tasks')
+      success: async (ctx, output) => {
+        ctx.res.redirect('/tasks')
       },
     },
   }

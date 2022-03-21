@@ -1,9 +1,10 @@
 import express from 'express'
-import { ServerRouter, ActionDescriptor } from 'restrant2'
+import { ServerRouter } from 'restrant2'
 import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
 import displayRoutes from 'express-routemap'
+import { createOptions } from './endpoint_options'
 
 const debug = createDebug('tasks:params')
 const app = express()
@@ -37,28 +38,8 @@ app.use((req, res, next) => {
   }
 })
 
-const createResourceMethodOptions = (
-  req: express.Request,
-  res: express.Response,
-  httpPath: string,
-  ad: ActionDescriptor
-) => {
-  debug('createResourceMethodOptions: %s', req.params)
-  if (req.params.adminId) {
-    return [
-      {
-        admin: {
-          id: Number(req.params.adminId),
-          accessedAt: new Date(),
-        },
-      },
-    ]
-  }
-  return []
-}
-
 const router: ServerRouter = new ServerRouter(__dirname, '/', {
-  createResourceMethodOptions,
+  createOptions,
 })
 app.use(router.router)
 routes(router).then(() => {

@@ -8,7 +8,7 @@ export type Task = {
   done: boolean
 }
 
-export default defineResource((support, options) => {
+export default defineResource((support, routeConfig) => {
   const tasks: Map<number, Task> = new Map([
     [1, { id: 1, title: 'test1', description: 'test', done: false }],
     [2, { id: 2, title: 'test2', description: 'test', done: false }],

@@ -17,19 +17,19 @@ export type ConstructActionDescriptor = {
   sources?: readonly ConstructSource[]
 }
 
-export type ConstructOption = {
+export type ConstructConfig = {
   [key: string]: ConstructActionDescriptor
 }
 
-export type RouteOption = {
+export type RouteConfig = {
   name: string
-  construct?: ConstructOption
+  construct?: ConstructConfig
   actions?: readonly ActionDescriptor[]
 }
 
 export interface Router {
   sub(...args: any[]): Router
-  resources(path: string, options: RouteOption): Promise<void>
+  resources(path: string, config: RouteConfig): Promise<void>
 }
 
 export namespace Actions {
@@ -120,30 +120,44 @@ export namespace Actions {
 
 export type ValidationError = z.ZodError
 
-export type Handler = (req: express.Request, res: express.Response) => void
+export class ActionContext {
+  constructor(readonly req: express.Request, readonly res: express.Response) {}
+}
+
+export type Handler = (ctx: ActionContext) => void
 
 export type PostHandler = {
-  success: (output: any, req: express.Request, res: express.Response) => Promise<void>
-  invalid?: (err: ValidationError, req: express.Request, res: express.Response) => Promise<void>
-  fatal?: (err: Error, req: express.Request, res: express.Response) => Promise<void>
+  success: (ctx: ActionContext, output: any, ...options: any) => Promise<void>
+  invalid?: (ctx: ActionContext, err: ValidationError, ...options: any) => Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, ...options: any) => Promise<void>
+}
+
+export type PostHandler2<O> = {
+  success: (ctx: ActionContext, output: any, option: O) => Promise<void>
+  invalid?: (ctx: ActionContext, err: ValidationError, option: O) => Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
 }
 
 export type Handlers = {
   [key: string]: Handler | PostHandler
 }
 
+export type Handlers2<O> = {
+  [key: string]: Handler | PostHandler2<O>
+}
+
 export class RouterError extends Error {}
 
-export type CreateResourceMethodArguments = {
+export type CreateOptionsFunction = {
   (req: express.Request, res: express.Response, httpPath: string, ad: ActionDescriptor): any[]
 }
 
-export type ServerRouterOption = {
+export type ServerRouterConfig = {
   inputKey: string
   errorKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  createResourceMethodOptions: CreateResourceMethodArguments
+  createOptions: CreateOptionsFunction
   actionRoot: string
   handlersFileName: string
   resourceRoot: string
@@ -158,25 +172,29 @@ export type InputArranger = (
 ) => Record<string, any>
 
 export class ActionSupport {
-  constructor(readonly rootPath: string, readonly routerOption: ServerRouterOption) {}
+  constructor(readonly rootPath: string, readonly routerConfig: ServerRouterConfig) {}
 
   input(req: express.Request): any {
-    return (req as any)[this.routerOption.inputKey]
+    return (req as any)[this.routerConfig.inputKey]
   }
 
   error(req: express.Request): ValidationError {
-    return (req as any)[this.routerOption.errorKey]
+    return (req as any)[this.routerConfig.errorKey]
   }
 }
 
 export class ResourceSupport {
-  constructor(readonly rootPath: string, readonly routerOption: ServerRouterOption) {}
+  constructor(readonly rootPath: string, readonly routerConfig: ServerRouterConfig) {}
 }
 
-export function defineResource(callback: (support: ResourceSupport, options: RouteOption) => Record<string, Function>) {
+export function defineResource(callback: (support: ResourceSupport, config: RouteConfig) => Record<string, Function>) {
   return callback
 }
 
-export function defineHandlers(callback: (support: ActionSupport, options: RouteOption) => Handlers) {
+export function defineMultipleOptionHandlers(callback: (support: ActionSupport, config: RouteConfig) => Handlers) {
+  return callback
+}
+
+export function defineHandlers<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Handlers2<O>) {
   return callback
 }

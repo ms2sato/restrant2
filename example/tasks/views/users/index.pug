@@ -1,25 +1,21 @@
-h1 Taks list 
-a(href="/tasks/build") create new task
+h1 User list 
+a(href=`/admins/${admin.id}/users/build`) create new user
 table(border="1")
   thead 
     tr
-      th done 
       th id
-      th title 
-      th description
+      th name
+      th photo
       th actions
   tbody 
-    each task in tasks 
+    each user in users 
       tr 
+        td=user.id
+        td=user.name
+        td=user.photo
         td 
-          if(task.done)
-            | closed
-          else
-            a(href=`tasks/${task.id}/done?_method=post`) done
-        td=task.id
-        td=task.title
-        td=task.description
-        td 
-          a(href=`/tasks/${task.id}/edit`) edit
+          a(href=`/admins/${admin.id}/users/${user.id}/edit`) edit
           |&nbsp;|&nbsp;
-          a(href=`/tasks/${task.id}?_method=delete`) delete
+          a(href=`/admins/${admin.id}/users/${user.id}?_method=delete`) delete
+hr
+div= languages          

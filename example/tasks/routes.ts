@@ -17,6 +17,9 @@ export async function routes(router: Router) {
   const adminRouter = router.sub('/admins/:adminId')
   await adminRouter.resources('/users', {
     name: 'adminUser',
-    actions: Actions.standard({ only: ['index'] }),
+    construct: {
+      edit: { schema: idSchema },
+    },
+    actions: Actions.standard({ only: ['index', 'edit'] }),
   })
 }
