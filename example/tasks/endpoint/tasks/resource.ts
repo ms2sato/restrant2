@@ -1,5 +1,5 @@
-import { IdNumberParams, TaskCreateParams, TaskUpdateParams } from '../../params'
-import { defineResource } from 'restrant2'
+import { TaskCreateParams, TaskUpdateParams } from '../../params'
+import { IdNumberParams, defineResource } from 'restrant2'
 
 export type Task = {
   id: number

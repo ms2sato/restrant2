@@ -1,5 +1,5 @@
-import { idNumberSchema, taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
-import { Router, Actions } from 'restrant2'
+import { taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
+import { idNumberSchema, Router, Actions } from 'restrant2'
 
 export async function routes(router: Router) {
   await router.resources('/tasks', {

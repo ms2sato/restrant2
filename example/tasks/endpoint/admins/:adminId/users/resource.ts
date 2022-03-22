@@ -1,5 +1,5 @@
-import { IdNumberParams, UserCreateParams, UserUpdateParams } from '../../../../params'
-import { defineResource } from 'restrant2'
+import { UserCreateParams, UserUpdateParams } from '../../../../params'
+import { IdNumberParams, defineResource } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 
 export type User = {
