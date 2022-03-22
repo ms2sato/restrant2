@@ -9,12 +9,11 @@ import {
   ActionSupport,
   ConstructConfig,
   ConstructDescriptor,
-  ConstructSource,
   CreateOptionsFunction,
   Handler,
-  Handlers,
+  MultiOptionHandlers,
   InputArranger,
-  PostHandler,
+  MultiOptionPostHandler,
   ResourceSupport,
   RouteConfig,
   Router,
@@ -198,7 +197,7 @@ export class ServerRouter extends BasicRouter {
     )
 
     const handlersPath = this.getHandlersPath(rpath)
-    const handlers: Handlers = await importAndSetup(
+    const handlers: MultiOptionHandlers = await importAndSetup(
       this.fileRoot,
       handlersPath,
       new ActionSupport(this.fileRoot, this.routerConfig),
@@ -211,7 +210,7 @@ export class ServerRouter extends BasicRouter {
       const actionName = ad.action
 
       const resourceMethod: Function | undefined = resource[actionName]
-      const actionFunc: Handler | PostHandler | undefined = handlers[actionName]
+      const actionFunc: Handler | MultiOptionPostHandler | undefined = handlers[actionName]
       const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function

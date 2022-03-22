@@ -121,29 +121,46 @@ export namespace Actions {
 export type ValidationError = z.ZodError
 
 export class ActionContext {
-  constructor(readonly req: express.Request, readonly res: express.Response) {}
+  readonly render
+  readonly redirect
+
+  constructor(readonly req: express.Request, readonly res: express.Response) {
+    // @see https://stackoverflow.com/questions/47647709/method-alias-with-typescript
+    this.render = this.res.render.bind(this.res)
+    this.redirect = this.res.redirect.bind(this.res)
+  }
+
+  get params() {
+    return this.req.params
+  }
+  get body() {
+    return this.req.body
+  }
+  get query() {
+    return this.req.query
+  }
 }
 
 export type Handler = (ctx: ActionContext) => void
 
-export type PostHandler = {
+export type MultiOptionPostHandler = {
   success: (ctx: ActionContext, output: any, ...options: any) => Promise<void>
   invalid?: (ctx: ActionContext, err: ValidationError, ...options: any) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, ...options: any) => Promise<void>
 }
 
-export type PostHandler2<O> = {
+export type PostHandler<O> = {
   success: (ctx: ActionContext, output: any, option: O) => Promise<void>
   invalid?: (ctx: ActionContext, err: ValidationError, option: O) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
 }
 
-export type Handlers = {
-  [key: string]: Handler | PostHandler
+export type MultiOptionHandlers = {
+  [key: string]: Handler | MultiOptionPostHandler
 }
 
-export type Handlers2<O> = {
-  [key: string]: Handler | PostHandler2<O>
+export type Handlers<O> = {
+  [key: string]: Handler | PostHandler<O>
 }
 
 export class RouterError extends Error {}
@@ -157,8 +174,8 @@ export type ServerRouterConfig = {
   errorKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  createOptions: CreateOptionsFunction,
-  constructConfig: ConstructConfig,
+  createOptions: CreateOptionsFunction
+  constructConfig: ConstructConfig
   actionRoot: string
   handlersFileName: string
   resourceRoot: string
@@ -192,10 +209,12 @@ export function defineResource(callback: (support: ResourceSupport, config: Rout
   return callback
 }
 
-export function defineMultipleOptionHandlers(callback: (support: ActionSupport, config: RouteConfig) => Handlers) {
+export function defineMultiOptionHandlers(
+  callback: (support: ActionSupport, config: RouteConfig) => MultiOptionHandlers
+) {
   return callback
 }
 
-export function defineHandlers<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Handlers2<O>) {
+export function defineHandlers<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Handlers<O>) {
   return callback
 }
