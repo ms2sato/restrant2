@@ -1,4 +1,4 @@
-import { IdParams, UserCreateParams, UserUpdateParams } from '../../../../params'
+import { IdNumberParams, UserCreateParams, UserUpdateParams } from '../../../../params'
 import { defineResource } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 
@@ -41,7 +41,7 @@ export default defineResource((support, options) => {
       return user
     },
 
-    edit: (params: IdParams) => {
+    edit: (params: IdNumberParams) => {
       console.log(params)
       return get(params.id)
     },
@@ -54,7 +54,7 @@ export default defineResource((support, options) => {
       return user
     },
 
-    destroy: (params: IdParams) => {
+    destroy: (params: IdNumberParams) => {
       console.log(params)
       const user = get(params.id)
       users.delete(params.id)

@@ -26,7 +26,7 @@ export default defineHandlers((support, routeConfig) => {
         ctx.res.redirect('/tasks')
       },
       invalid: async (ctx, err) => {
-        ctx.res.render('tasks/edit', { task: ctx.req.body, err })
+        ctx.res.render('tasks/edit', { task: { id: ctx.req.params.id, ...ctx.req.body }, err })
       },
     },
 

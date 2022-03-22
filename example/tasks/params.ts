@@ -1,10 +1,6 @@
-import { z } from 'zod'
+import { z } from 'restrant2'
 
-export const idSchema = z.object({
-  id: z.number(),
-})
-
-export type IdParams = z.infer<typeof idSchema>
+export { idNumberSchema, IdNumberParams } from 'restrant2'
 
 const taskCoreProps = {
   title: z.string().min(3).max(255),
@@ -22,7 +18,6 @@ export const taskUpdateSchema = z.object({
 })
 
 export type TaskUpdateParams = z.infer<typeof taskUpdateSchema>
-
 
 const userCoreProps = {
   name: z.string().min(3).max(255),

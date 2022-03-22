@@ -1,4 +1,4 @@
-import { IdParams, TaskCreateParams, TaskUpdateParams } from '../../params'
+import { IdNumberParams, TaskCreateParams, TaskUpdateParams } from '../../params'
 import { defineResource } from 'restrant2'
 
 export type Task = {
@@ -41,7 +41,7 @@ export default defineResource((support, routeConfig) => {
       return task
     },
 
-    edit: (params: IdParams) => {
+    edit: (params: IdNumberParams) => {
       console.log(params)
       return get(params.id)
     },
@@ -54,14 +54,14 @@ export default defineResource((support, routeConfig) => {
       return task
     },
 
-    destroy: (params: IdParams) => {
+    destroy: (params: IdNumberParams) => {
       console.log(params)
       const task = get(params.id)
       tasks.delete(params.id)
       return task
     },
 
-    done: (params: IdParams) => {
+    done: (params: IdNumberParams) => {
       console.log(params)
       const task = get(params.id)
       task.done = true

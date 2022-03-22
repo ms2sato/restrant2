@@ -13,7 +13,7 @@ export type ActionDescriptor = {
 }
 
 export type ConstructDescriptor = {
-  schema?: z.AnyZodObject
+  schema?: z.AnyZodObject | null
   sources?: readonly ConstructSource[]
 }
 
@@ -157,7 +157,8 @@ export type ServerRouterConfig = {
   errorKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  createOptions: CreateOptionsFunction
+  createOptions: CreateOptionsFunction,
+  constructConfig: ConstructConfig,
   actionRoot: string
   handlersFileName: string
   resourceRoot: string

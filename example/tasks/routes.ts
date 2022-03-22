@@ -1,14 +1,12 @@
-import { idSchema, taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
+import { idNumberSchema, taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
 import { Router, Actions } from 'restrant2'
 
 export async function routes(router: Router) {
   await router.resources('/tasks', {
     construct: {
       create: { schema: taskCreateSchema },
-      edit: { schema: idSchema },
       update: { schema: taskUpdateSchema },
-      destroy: { schema: idSchema },
-      done: { schema: idSchema },
+      done: { schema: idNumberSchema },
     },
     name: 'task',
     actions: [...Actions.standard({ except: ['show'] }), { action: 'done', path: '/:id/done', method: 'post' }],
@@ -17,9 +15,6 @@ export async function routes(router: Router) {
   const adminRouter = router.sub('/admins/:adminId')
   await adminRouter.resources('/users', {
     name: 'adminUser',
-    construct: {
-      edit: { schema: idSchema },
-    },
     actions: Actions.standard({ only: ['index', 'edit'] }),
   })
 }

@@ -7,6 +7,7 @@ import {
   ActionDescriptor,
   Actions,
   ActionSupport,
+  ConstructConfig,
   ConstructDescriptor,
   ConstructSource,
   CreateOptionsFunction,
@@ -28,14 +29,21 @@ const handlerLog = log.extend('handler')
 export const blankSchema = z.object({})
 export type BlankParams = z.infer<typeof blankSchema>
 
-const defaultConstructSources: Record<string, readonly ConstructSource[]> = {
-  build: ['params'],
-  edit: ['params'],
-  show: ['params'],
-  index: ['params'],
-  create: ['body', 'files', 'params'],
-  update: ['body', 'files', 'params'],
-  destroy: ['params'],
+export const idNumberSchema = z.object({
+  id: z.number(),
+})
+export type IdNumberParams = z.infer<typeof idNumberSchema>
+
+function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
+  return {
+    build: { schema: blankSchema, sources: ['params'] },
+    edit: { schema: idSchema, sources: ['params'] },
+    show: { schema: idSchema, sources: ['params'] },
+    index: { schema: blankSchema, sources: ['params'] },
+    create: { sources: ['body', 'files', 'params'] },
+    update: { sources: ['body', 'files', 'params'] },
+    destroy: { schema: idSchema, sources: ['params'] },
+  }
 }
 
 const mergeSource = (req: express.Request, sources: readonly string[]): Record<string, any> => {
@@ -131,6 +139,7 @@ function defaultServerRouterConfig(): ServerRouterConfig {
     actions: Actions.standard(),
     inputArranger: smartInputArranger,
     createOptions: createNullOptions,
+    constructConfig: defaultConstructConfig(),
     actionRoot: './endpoint',
     handlersFileName: 'handlers',
     resourceRoot: './endpoint',
@@ -220,7 +229,22 @@ export class ServerRouter extends BasicRouter {
         )
       }
 
-      const defaultSources = defaultConstructSources[actionName] || ['params']
+      const constructDescriptor: ConstructDescriptor | undefined = this.routerConfig.constructConfig[actionName]
+      let schema: z.AnyZodObject | null = null
+      if (resourceMethod) {
+        if (cad?.schema === undefined) {
+          if (!constructDescriptor.schema) {
+            throw new Error(`construct.schema not found: ${resourcePath}#${actionName}`)
+          }
+          schema = constructDescriptor.schema
+        } else if (cad.schema === null) {
+          schema = blankSchema
+        } else {
+          schema = cad.schema
+        }
+      }
+
+      const defaultSources = constructDescriptor?.sources || ['params']
 
       const handler: express.Handler = async (req, res, next) => {
         const ctx = new ActionContext(req, res)
@@ -290,9 +314,9 @@ export class ServerRouter extends BasicRouter {
       let params
       const urlPath = path.join(rpath, ad.path)
       handlerLog('%s#%s ConstructActionDescriptor: %s', handlersPath, actionName, cad?.schema?.constructor.name)
-      if (resourceMethod && cad?.schema) {
+      if (resourceMethod) {
         handlerLog('%s#%s with construct middleware', handlersPath, actionName)
-        params = [constructMiddleware(cad.schema, cad.sources || defaultSources, this.routerConfig), handler]
+        params = [constructMiddleware(schema!, cad?.sources || defaultSources, this.routerConfig), handler]
       } else {
         handlerLog('%s#%s without construct middleware', handlersPath, actionName)
         params = [handler]
