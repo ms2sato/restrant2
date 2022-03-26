@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node dist/index",
     "build": "npx tsc",
+    "clean": "npx rimraf dist",
     "dev": "DEBUG=restrant2:*,tasks:* nodemon index.ts",
     "link": "npm link ../../../restrant2",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -23,6 +24,7 @@
     "@types/method-override": "^0.0.32",
     "express-routemap": "^1.6.0",
     "nodemon": "^2.0.15",
+    "rimraf": "^3.0.2",
     "ts-node": "^10.5.0",
     "typescript": "^4.6.2"
   }
