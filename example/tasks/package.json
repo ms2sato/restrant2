@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node dist/index",
     "build": "npx tsc",
     "dev": "DEBUG=restrant2:*,tasks:* nodemon index.ts",
     "link": "npm link ../../../restrant2",
