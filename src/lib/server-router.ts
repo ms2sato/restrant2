@@ -131,7 +131,7 @@ export const importAndSetup = async (
   }
 }
 
-function defaultServerRouterConfig(): ServerRouterConfig {
+export function defaultServerRouterConfig(): ServerRouterConfig {
   return {
     inputKey: 'input',
     errorKey: 'validationError',
