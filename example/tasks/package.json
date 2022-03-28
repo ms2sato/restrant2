@@ -7,7 +7,7 @@
     "start": "node dist/index",
     "build": "npx tsc",
     "clean": "npx rimraf dist",
-    "dev": "DEBUG=restrant2:*,tasks:* nodemon index.ts",
+    "dev": "DEBUG=restrant2:*,tasks:* nodemon src/index.ts",
     "link": "npm link ../../../restrant2",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

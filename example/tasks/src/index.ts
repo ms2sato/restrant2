@@ -4,6 +4,7 @@ import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
 import displayRoutes from 'express-routemap'
+import path from 'path'
 import { createOptions } from './endpoint_options'
 
 const debug = createDebug('tasks:params')
@@ -11,6 +12,7 @@ const app = express()
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
+app.set('views', path.join(__dirname, '../views'))
 app.set('view engine', 'pug')
 
 // @see http://expressjs.com/en/resources/middleware/method-override.html
