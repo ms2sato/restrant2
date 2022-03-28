@@ -53,14 +53,13 @@ export async function setup() {
   app.use(router.router)
   await routes(router)
 
-  app.use((req, res, next) => {
-    next(createError(404))
+  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(err.stack)
+    next(err)
   })
 
-  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error(err.message)
-    console.error(err.stack)
-    next()
+  app.use((req, res, next) => {
+    next(createError(404))
   })
 
   return app
