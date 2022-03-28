@@ -9,7 +9,7 @@ beforeAll(async () => {
 
 test('GET /', async () => {
   const response = await request(app).get('/tasks')
-  
+
   expect(response.statusCode).toBe(200)
   expect(response.text).toContain('test1')
   expect(response.text).toContain('test2')
@@ -100,4 +100,3 @@ test('POST /:id/done', async () => {
     expect(response.text).toContain('closed')
   }
 })
-

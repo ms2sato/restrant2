@@ -26,12 +26,10 @@ export default defineResource((support, routeConfig) => {
 
   return {
     index: () => {
-      console.log(tasks)
       return Array.from(tasks, ([id, data]) => data)
     },
 
     create: (params: TaskCreateParams) => {
-      console.log(params)
       const task: Task = {
         ...params,
         id: ++lastId,
@@ -42,12 +40,10 @@ export default defineResource((support, routeConfig) => {
     },
 
     edit: (params: IdNumberParams) => {
-      console.log(params)
       return get(params.id)
     },
 
     update: (params: TaskUpdateParams) => {
-      console.log(params)
       const { id, ...data } = params
       const task = { ...get(id), ...data }
       tasks.set(id, task)
@@ -55,14 +51,12 @@ export default defineResource((support, routeConfig) => {
     },
 
     destroy: (params: IdNumberParams) => {
-      console.log(params)
       const task = get(params.id)
       tasks.delete(params.id)
       return task
     },
 
     done: (params: IdNumberParams) => {
-      console.log(params)
       const task = get(params.id)
       task.done = true
       return task

@@ -26,13 +26,10 @@ export default defineResource((support, options) => {
 
   return {
     index: (option: AcceptLanguageOption) => {
-      console.log(users)
-      console.log(option)
       return Array.from(users, ([id, data]) => data)
     },
 
     create: (params: UserCreateParams) => {
-      console.log(params)
       const user: User = {
         ...params,
         id: ++lastId,
@@ -42,12 +39,10 @@ export default defineResource((support, options) => {
     },
 
     edit: (params: IdNumberParams) => {
-      console.log(params)
       return get(params.id)
     },
 
     update: (params: UserUpdateParams) => {
-      console.log(params)
       const { id, ...data } = params
       const user = { ...get(id), ...data }
       users.set(id, user)
@@ -55,7 +50,6 @@ export default defineResource((support, options) => {
     },
 
     destroy: (params: IdNumberParams) => {
-      console.log(params)
       const user = get(params.id)
       users.delete(params.id)
       return user
