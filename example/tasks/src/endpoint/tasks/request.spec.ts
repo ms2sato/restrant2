@@ -1,6 +1,6 @@
 import request from 'supertest'
 import { Application } from 'express'
-import { setup } from '../../src/web'
+import { setup } from '../../web'
 
 let app: Application
 beforeAll(async () => {
