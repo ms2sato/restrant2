@@ -21,7 +21,7 @@ export class UploadedFileCache {
     return await save(uploadedFile, this.cacheDir)
   }
 
-  async switchDir(to: string, key: string): Promise<string> {
+  switchDir(to: string, key: string): string {
     const cachePath = path.join(this.cacheDir, key)
     if (!fs.existsSync(cachePath)) {
       throw new Error(`Cached file lost: ${cachePath}`)

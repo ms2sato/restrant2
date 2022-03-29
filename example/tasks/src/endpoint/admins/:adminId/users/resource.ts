@@ -49,7 +49,7 @@ export default defineResource((support, options) => {
       if (photo) {
         user.photo = await saveFile(photo)
       } else if (photoCache) {
-        user.photo = await globalUploadedFileCache.switchDir(resourceRoot, photoCache)
+        user.photo = globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(user.id, user)
@@ -67,7 +67,7 @@ export default defineResource((support, options) => {
       if (photo) {
         user.photo = await saveFile(photo)
       } else if (photoCache) {
-        user.photo = await globalUploadedFileCache.switchDir(resourceRoot, photoCache)
+        user.photo = globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(id, user)
