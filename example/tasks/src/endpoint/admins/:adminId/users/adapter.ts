@@ -1,7 +1,7 @@
-import { defineHandlers } from 'restrant2'
+import { defineAdapter } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 
-export default defineHandlers<AcceptLanguageOption>((support, routeConfig) => {
+export default defineAdapter<AcceptLanguageOption>((support, routeConfig) => {
   return {
     index: {
       success: async (ctx, output, option) =>

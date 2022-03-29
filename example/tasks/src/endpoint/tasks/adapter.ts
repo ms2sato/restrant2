@@ -1,6 +1,6 @@
-import { defineHandlers } from 'restrant2'
+import { defineAdapter } from 'restrant2'
 
-export default defineHandlers((support, routeConfig) => {
+export default defineAdapter((support, routeConfig) => {
   return {
     index: {
       success: async (ctx, output) => ctx.render('tasks/index', { tasks: output }),

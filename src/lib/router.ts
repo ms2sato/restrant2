@@ -143,24 +143,24 @@ export class ActionContext {
 
 export type Handler = (ctx: ActionContext) => void
 
-export type MultiOptionPostHandler = {
+export type MultiOptionResponder = {
   success: (ctx: ActionContext, output: any, ...options: any) => Promise<void>
   invalid?: (ctx: ActionContext, err: ValidationError, ...options: any) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, ...options: any) => Promise<void>
 }
 
-export type PostHandler<O> = {
+export type Responder<O> = {
   success: (ctx: ActionContext, output: any, option: O) => Promise<void>
   invalid?: (ctx: ActionContext, err: ValidationError, option: O) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
 }
 
-export type MultiOptionHandlers = {
-  [key: string]: Handler | MultiOptionPostHandler
+export type MultiOptionAdapter = {
+  [key: string]: Handler | MultiOptionResponder
 }
 
-export type Handlers<O> = {
-  [key: string]: Handler | PostHandler<O>
+export type Adapter<O> = {
+  [key: string]: Handler | Responder<O>
 }
 
 export class RouterError extends Error {}
@@ -177,7 +177,7 @@ export type ServerRouterConfig = {
   createOptions: CreateOptionsFunction
   constructConfig: ConstructConfig
   actionRoot: string
-  handlersFileName: string
+  adapterFileName: string
   resourceRoot: string
   resourceFileName: string
 }
@@ -209,12 +209,12 @@ export function defineResource(callback: (support: ResourceSupport, config: Rout
   return callback
 }
 
-export function defineMultiOptionHandlers(
-  callback: (support: ActionSupport, config: RouteConfig) => MultiOptionHandlers
+export function defineMultiOptionAdapter(
+  callback: (support: ActionSupport, config: RouteConfig) => MultiOptionAdapter
 ) {
   return callback
 }
 
-export function defineHandlers<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Handlers<O>) {
+export function defineAdapter<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Adapter<O>) {
   return callback
 }

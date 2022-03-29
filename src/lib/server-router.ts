@@ -11,9 +11,9 @@ import {
   ConstructDescriptor,
   CreateOptionsFunction,
   Handler,
-  MultiOptionHandlers,
+  MultiOptionAdapter,
   InputArranger,
-  MultiOptionPostHandler,
+  MultiOptionResponder,
   ResourceSupport,
   RouteConfig,
   Router,
@@ -140,7 +140,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     createOptions: createNullOptions,
     constructConfig: defaultConstructConfig(),
     actionRoot: './endpoint',
-    handlersFileName: 'handlers',
+    adapterFileName: 'adapter',
     resourceRoot: './endpoint',
     resourceFileName: 'resource',
   }
@@ -169,7 +169,7 @@ export abstract class BasicRouter implements Router {
   }
 
   protected getHandlersPath(rpath: string) {
-    return path.join(this.routerConfig.actionRoot, this.getHttpPath(rpath), this.routerConfig.handlersFileName)
+    return path.join(this.routerConfig.actionRoot, this.getHttpPath(rpath), this.routerConfig.adapterFileName)
   }
 }
 
@@ -196,10 +196,10 @@ export class ServerRouter extends BasicRouter {
       config
     )
 
-    const handlersPath = this.getHandlersPath(rpath)
-    const handlers: MultiOptionHandlers = await importAndSetup(
+    const adapterPath = this.getHandlersPath(rpath)
+    const adapter: MultiOptionAdapter = await importAndSetup(
       this.fileRoot,
-      handlersPath,
+      adapterPath,
       new ActionSupport(this.fileRoot, this.routerConfig),
       config
     )
@@ -210,14 +210,14 @@ export class ServerRouter extends BasicRouter {
       const actionName = ad.action
 
       const resourceMethod: Function | undefined = resource[actionName]
-      const actionFunc: Handler | MultiOptionPostHandler | undefined = handlers[actionName]
+      const actionFunc: Handler | MultiOptionResponder | undefined = adapter[actionName]
       const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function
       if (!actionOverride) {
         if (resourceMethod === undefined) {
           throw new RouterError(
-            `Handler not found! define ${resourcePath}#${actionName} or/and ${handlersPath}#${actionName}`
+            `Handler not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
           )
         }
       }
@@ -250,7 +250,7 @@ export class ServerRouter extends BasicRouter {
 
         if (actionFunc instanceof Function) {
           try {
-            handlerLog('%s#%s as Handler', handlersPath, actionName)
+            handlerLog('%s#%s as Handler', adapterPath, actionName)
             await actionFunc(ctx)
           } catch (err) {
             next(err)
@@ -263,17 +263,17 @@ export class ServerRouter extends BasicRouter {
         try {
           const validationError = (req as any).validationError
           if (validationError) {
-            handlerLog.extend('debug')('%s#%s validationError %s', handlersPath, actionName, validationError.message)
+            handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
             if (actionFunc) {
               if (actionFunc.invalid) {
-                handlerLog('%s#%s.invalid', handlersPath, actionName)
+                handlerLog('%s#%s.invalid', adapterPath, actionName)
                 res.status(422)
-                await actionFunc.invalid.apply(handlers, [ctx, validationError, ...options])
+                await actionFunc.invalid.apply(adapter, [ctx, validationError, ...options])
               } else {
                 next(validationError)
               }
             } else {
-              handlerLog('%s#%s invalid as json', handlersPath, actionName)
+              handlerLog('%s#%s invalid as json', adapterPath, actionName)
               res.status(422)
               res.json({
                 status: 'error',
@@ -290,10 +290,10 @@ export class ServerRouter extends BasicRouter {
           const output = await resourceMethod!.apply(resource, args)
 
           if (actionFunc) {
-            handlerLog('%s#%s.success', handlersPath, actionName)
-            await actionFunc.success.apply(handlers, [ctx, output, ...options])
+            handlerLog('%s#%s.success', adapterPath, actionName)
+            await actionFunc.success.apply(adapter, [ctx, output, ...options])
           } else {
-            handlerLog('%s#%s success as json', handlersPath, actionName)
+            handlerLog('%s#%s success as json', adapterPath, actionName)
             res.json({ status: 'success', data: output })
           }
         } catch (err) {
@@ -302,8 +302,8 @@ export class ServerRouter extends BasicRouter {
           }
 
           try {
-            handlerLog('%s#%s.fatal', handlersPath, actionName)
-            await actionFunc.fatal.apply(handlers, [ctx, err as Error, ...options])
+            handlerLog('%s#%s.fatal', adapterPath, actionName)
+            await actionFunc.fatal.apply(adapter, [ctx, err as Error, ...options])
           } catch (er) {
             next(er)
           }
@@ -312,12 +312,12 @@ export class ServerRouter extends BasicRouter {
 
       let params
       const urlPath = path.join(rpath, ad.path)
-      handlerLog('%s#%s ConstructActionDescriptor: %s', handlersPath, actionName, cad?.schema?.constructor.name)
+      handlerLog('%s#%s ConstructActionDescriptor: %s', adapterPath, actionName, cad?.schema?.constructor.name)
       if (resourceMethod) {
-        handlerLog('%s#%s with construct middleware', handlersPath, actionName)
+        handlerLog('%s#%s with construct middleware', adapterPath, actionName)
         params = [constructMiddleware(schema!, cad?.sources || defaultSources, this.routerConfig), handler]
       } else {
-        handlerLog('%s#%s without construct middleware', handlersPath, actionName)
+        handlerLog('%s#%s without construct middleware', adapterPath, actionName)
         params = [handler]
       }
 
