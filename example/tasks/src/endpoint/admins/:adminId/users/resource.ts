@@ -1,17 +1,19 @@
-import { UserCreateParams, UserUpdateParams } from '../../../../params'
-import { IdNumberParams, defineResource } from 'restrant2'
+import path from 'path'
+import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
+import { IdNumberParams, defineResource, UploadedFileParams } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 
 export type User = {
   id: number
   name: string
   photo?: string
+  adminId: number
 }
 
 export default defineResource((support, options) => {
   const users: Map<number, User> = new Map([
-    [1, { id: 1, name: 'test1' }],
-    [2, { id: 2, name: 'test2' }],
+    [1, { id: 1, name: 'test1', adminId: 1 }],
+    [2, { id: 2, name: 'test2', adminId: 1 }],
   ])
 
   let lastId = 2
@@ -24,27 +26,50 @@ export default defineResource((support, options) => {
     return user
   }
 
+  const resourceRoot = path.join(support.rootPath, '../uploaded')
+
+  const randomString = () => Math.random().toString(36).substring(2, 15)
+
+  const saveFile = async (uploadedFile: UploadedFileParams) => {
+    const fileName = randomString()
+    const filePath = path.join(resourceRoot, fileName)
+    await uploadedFile.mv(filePath)
+    return fileName
+  }
+
   return {
     index: (option: AcceptLanguageOption) => {
       return Array.from(users, ([id, data]) => data)
     },
 
-    create: (params: UserCreateParams) => {
+    create: async (params: UserCreateParams) => {
+      const { photo, ...data } = params
+
       const user: User = {
-        ...params,
+        ...data,
         id: ++lastId,
       }
+
+      if (photo) {
+        user.photo = await saveFile(photo)
+      }
+
       users.set(user.id, user)
       return user
     },
 
-    edit: (params: IdNumberParams) => {
+    edit: (params: AdminWithIdNumberParams) => {
       return get(params.id)
     },
 
-    update: (params: UserUpdateParams) => {
-      const { id, ...data } = params
+    update: async (params: UserUpdateParams) => {
+      const { id, photo, ...data } = params
       const user = { ...get(id), ...data }
+
+      if (photo) {
+        user.photo = await saveFile(photo)
+      }
+
       users.set(id, user)
       return user
     },
@@ -53,6 +78,15 @@ export default defineResource((support, options) => {
       const user = get(params.id)
       users.delete(params.id)
       return user
+    },
+
+    photo: (params: AdminWithIdNumberParams) => {
+      const user = get(params.id)
+      if (!user.photo) {
+        return null
+      }
+
+      return path.join(resourceRoot, user.photo)
     },
   }
 })

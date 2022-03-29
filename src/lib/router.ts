@@ -145,13 +145,13 @@ export type Handler = (ctx: ActionContext) => void
 
 export type MultiOptionResponder = {
   success: (ctx: ActionContext, output: any, ...options: any) => Promise<void>
-  invalid?: (ctx: ActionContext, err: ValidationError, ...options: any) => Promise<void>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, ...options: any) => Promise<void>
 }
 
 export type Responder<O> = {
   success: (ctx: ActionContext, output: any, option: O) => Promise<void>
-  invalid?: (ctx: ActionContext, err: ValidationError, option: O) => Promise<void>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: any, option: O) => Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
 }
 
@@ -172,11 +172,12 @@ export type CreateOptionsFunction = {
 export type ServerRouterConfig = {
   inputKey: string
   errorKey: string
+  sourceKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
   createOptions: CreateOptionsFunction
   constructConfig: ConstructConfig
-  actionRoot: string
+  adapterRoot: string
   adapterFileName: string
   resourceRoot: string
   resourceFileName: string

@@ -12,7 +12,11 @@ table(border="1")
       tr 
         td=user.id
         td=user.name
-        td=user.photo
+        td
+          if user.photo
+            img(src=`/admins/${admin.id}/users/${user.id}/photo`, width="120")
+          else 
+            div Phot not found
         td 
           a(href=`/admins/${admin.id}/users/${user.id}/edit`) edit
           |&nbsp;|&nbsp;

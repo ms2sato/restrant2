@@ -1,10 +1,12 @@
 import express from 'express'
 import createError from 'http-errors'
-import { ServerRouter } from 'restrant2'
-import { routes } from './routes'
 import createDebug from 'debug'
 import methodOverride from 'method-override'
 import path from 'path'
+import os from 'os'
+import fileUpload from 'express-fileupload'
+import { ServerRouter } from 'restrant2'
+import { routes } from './routes'
 import { createOptions } from './endpoint_options'
 
 process.on('uncaughtException', (err) => {
@@ -21,6 +23,13 @@ export async function setup() {
   app.use(express.urlencoded({ extended: false }))
   app.set('views', path.join(__dirname, '../views'))
   app.set('view engine', 'pug')
+
+  app.use(
+    fileUpload({
+      useTempFiles: true,
+      tempFileDir: os.tmpdir(),
+    })
+  )
 
   // @see http://expressjs.com/en/resources/middleware/method-override.html
   app.use(

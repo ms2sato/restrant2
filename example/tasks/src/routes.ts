@@ -1,4 +1,10 @@
-import { taskCreateSchema, taskUpdateSchema, userCreateSchema, userUpdateSchema } from './params'
+import {
+  taskCreateSchema,
+  taskUpdateSchema,
+  userCreateSchema,
+  userUpdateSchema,
+  adminWithIdNumberSchema,
+} from './params'
 import { idNumberSchema, Router, Actions } from 'restrant2'
 
 export async function routes(router: Router) {
@@ -14,7 +20,16 @@ export async function routes(router: Router) {
 
   const adminRouter = router.sub('/admins/:adminId')
   await adminRouter.resources('/users', {
-    name: 'adminUser',
-    actions: Actions.standard({ only: ['index', 'edit'] }),
+    name: 'admin_user',
+    construct: {
+      edit: { schema: adminWithIdNumberSchema },
+      create: { schema: userCreateSchema },
+      update: { schema: userUpdateSchema },
+      photo: { schema: adminWithIdNumberSchema },
+    },
+    actions: [
+      ...Actions.standard({ only: ['index', 'build', 'edit', 'create', 'update'] }),
+      { action: 'photo', path: '/:id/photo', method: 'get' },
+    ],
   })
 }
