@@ -15,5 +15,11 @@ mixin form(action, method)
       input(name="name", value=data.name)
     div  
       input(name="photo", type="file", value=data.photo)
+
+    if data.photoCache
+      div 
+        img(src=`/admins/${data.adminId}/users/photo_cache/${data.photoCache}`, width="120")   
+        input(name="photoCache", type="hidden", value=data.photoCache)
+
     div  
       input(type="submit")

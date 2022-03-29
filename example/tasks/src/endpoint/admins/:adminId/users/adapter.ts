@@ -1,6 +1,7 @@
 import { defineAdapter } from 'restrant2'
 import { User } from './resource'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
+import { globalUploadedFileCache } from '../../../../lib/upload'
 
 export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
   return {
@@ -20,7 +21,8 @@ export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
       invalid: async (ctx, err, source) => {
-        ctx.render('users/build', { data: source, err })
+        const photoCache = source.photo ? await globalUploadedFileCache.cache(source.photo) : undefined
+        ctx.render('users/build', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },
 
@@ -29,7 +31,8 @@ export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
       invalid: async (ctx, err, source) => {
-        ctx.render('users/edit', { data: source, err })
+        const photoCache = source.photo ? await globalUploadedFileCache.cache(source.photo) : undefined
+        ctx.render('users/edit', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },
 
@@ -47,6 +50,13 @@ export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
         }
         await ctx.res.sendFile(output)
       },
+    },
+
+    photoCache: async (ctx) => {
+      if (!ctx.params.key) {
+        throw new Error('Unexpected access')
+      }
+      await ctx.res.sendFile(globalUploadedFileCache.fullPath(ctx.params.key))
     },
   }
 })

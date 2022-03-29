@@ -28,6 +28,7 @@ const userCoreProps = {
   name: z.string().min(3).max(255),
   photo: uploadedFileSchema.optional(),
   adminId: z.number(),
+  photoCache: z.string().optional(),
 }
 
 export const userCreateSchema = z.object(userCoreProps)

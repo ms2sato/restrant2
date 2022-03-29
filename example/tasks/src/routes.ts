@@ -30,6 +30,7 @@ export async function routes(router: Router) {
     actions: [
       ...Actions.standard({ only: ['index', 'build', 'edit', 'create', 'update'] }),
       { action: 'photo', path: '/:id/photo', method: 'get' },
+      { action: 'photoCache', path: '/photo_cache/:key', method: 'get' },
     ],
   })
 }

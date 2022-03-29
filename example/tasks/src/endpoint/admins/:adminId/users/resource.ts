@@ -2,6 +2,7 @@ import path from 'path'
 import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
 import { IdNumberParams, defineResource, UploadedFileParams } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
+import { globalUploadedFileCache, save } from '../../../../lib/upload'
 
 export type User = {
   id: number
@@ -28,13 +29,8 @@ export default defineResource((support, options) => {
 
   const resourceRoot = path.join(support.rootPath, '../uploaded')
 
-  const randomString = () => Math.random().toString(36).substring(2, 15)
-
-  const saveFile = async (uploadedFile: UploadedFileParams) => {
-    const fileName = randomString()
-    const filePath = path.join(resourceRoot, fileName)
-    await uploadedFile.mv(filePath)
-    return fileName
+  const saveFile = (uploadedFile: UploadedFileParams) => {
+    return save(uploadedFile, resourceRoot)
   }
 
   return {
@@ -43,7 +39,7 @@ export default defineResource((support, options) => {
     },
 
     create: async (params: UserCreateParams) => {
-      const { photo, ...data } = params
+      const { photo, photoCache, ...data } = params
 
       const user: User = {
         ...data,
@@ -52,6 +48,8 @@ export default defineResource((support, options) => {
 
       if (photo) {
         user.photo = await saveFile(photo)
+      } else if (photoCache) {
+        user.photo = await globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(user.id, user)
@@ -63,11 +61,13 @@ export default defineResource((support, options) => {
     },
 
     update: async (params: UserUpdateParams) => {
-      const { id, photo, ...data } = params
+      const { id, photo, photoCache, ...data } = params
       const user = { ...get(id), ...data }
 
       if (photo) {
         user.photo = await saveFile(photo)
+      } else if (photoCache) {
+        user.photo = await globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(id, user)
