@@ -59,20 +59,19 @@ function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): Cons
   }
 }
 
-const mergeSources = (req: express.Request, sources: readonly string[]): Record<string, any> => {
+const mergeSources = (ctx: ActionContext, sources: readonly string[]): Record<string, any> => {
   let merged = {}
-  const record = req as Record<string, any>
+  const record = ctx.req as Record<string, any>
   for (const source of sources) {
     merged = { ...merged, ...record[source] }
   }
   return merged
 }
 
-const smartInputArranger: InputArranger = (
+export const smartInputArranger: InputArranger = (
   input: Record<string, any>,
   schema: z.ZodObject<any>,
-  req: express.Request,
-  res: express.Response
+  ctx: ActionContext
 ) => {
   for (const [key, val] of Object.entries(input)) {
     // TODO: for other type
@@ -87,12 +86,12 @@ type ResourceMethodHandlerParams = {
   resourceMethod: Function
   resource: any
   sources: readonly ConstructSource[]
-  routerOption: ServerRouterConfig
+  serverRouterConfig: ServerRouterConfig
   httpPath: string
   schema: z.AnyZodObject
   adapterPath: string
-  ad: ActionDescriptor
-  actionFunc: MultiOptionResponder
+  actionDescriptor: ActionDescriptor
+  responder: MultiOptionResponder
   adapter: MultiOptionAdapter
 }
 
@@ -100,20 +99,20 @@ const createResourceMethodHandler = ({
   resourceMethod,
   resource,
   sources,
-  routerOption,
+  serverRouterConfig,
   httpPath,
   schema,
   adapterPath,
-  ad,
-  actionFunc,
+  actionDescriptor,
+  responder,
   adapter,
 }: ResourceMethodHandlerParams): express.Handler => {
-  const actionName = ad.action
+  const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
     const ctx = new ActionContext(req, res)
-    const options = await routerOption.createOptions(req, res, httpPath, ad)
-    const source = routerOption.inputArranger(mergeSources(req, sources), schema, req, res)
+    const options = await serverRouterConfig.createOptions(ctx, httpPath, actionDescriptor)
+    const source = serverRouterConfig.inputArranger(mergeSources(ctx, sources), schema, ctx)
 
     try {
       const input = schema.parse(source)
@@ -123,9 +122,9 @@ const createResourceMethodHandler = ({
       handlerLog('resourceMethod args: %o', args)
       const output = await resourceMethod.apply(resource, args)
 
-      if (actionFunc) {
+      if (responder) {
         handlerLog('%s#%s.success', adapterPath, actionName)
-        await actionFunc.success.apply(adapter, [ctx, output, ...options])
+        await responder.success.apply(adapter, [ctx, output, ...options])
       } else {
         handlerLog('%s#%s success as json', adapterPath, actionName)
         res.json({ status: 'success', data: output })
@@ -134,11 +133,11 @@ const createResourceMethodHandler = ({
       if (err instanceof z.ZodError) {
         const validationError = err
         handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
-        if (actionFunc) {
-          if (actionFunc.invalid) {
+        if (responder) {
+          if (responder.invalid) {
             handlerLog('%s#%s.invalid', adapterPath, actionName)
             res.status(422)
-            await actionFunc.invalid.apply(adapter, [ctx, validationError, source, ...options])
+            await responder.invalid.apply(adapter, [ctx, validationError, source, ...options])
           } else {
             next(validationError)
           }
@@ -152,13 +151,13 @@ const createResourceMethodHandler = ({
           })
         }
       } else {
-        if (!actionFunc?.fatal) {
+        if (!responder?.fatal) {
           return next(err)
         }
 
         try {
           handlerLog('%s#%s.fatal', adapterPath, actionName)
-          await actionFunc.fatal.apply(adapter, [ctx, err as Error, ...options])
+          await responder.fatal.apply(adapter, [ctx, err as Error, ...options])
         } catch (er) {
           next(er)
         }
@@ -167,7 +166,7 @@ const createResourceMethodHandler = ({
   }
 }
 
-const createNullOptions: CreateOptionsFunction = async (req, res, httpPath, ad) => {
+const createNullOptions: CreateOptionsFunction = async (ctx, httpPath, ad) => {
   return []
 }
 
@@ -223,14 +222,14 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
 }
 
 export abstract class BasicRouter implements Router {
-  protected readonly routerConfig: ServerRouterConfig
+  protected readonly serverRouterConfig: ServerRouterConfig
 
   constructor(
     readonly fileRoot: string,
     readonly httpPath: string = '/',
-    routerConfig: Partial<ServerRouterConfig> = {}
+    serverRouterConfig: Partial<ServerRouterConfig> = {}
   ) {
-    this.routerConfig = Object.assign(defaultServerRouterConfig(), routerConfig)
+    this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
 
   abstract sub(...args: any[]): Router
@@ -241,24 +240,32 @@ export abstract class BasicRouter implements Router {
   }
 
   protected getResourcePath(rpath: string) {
-    return path.join(this.routerConfig.resourceRoot, this.getHttpPath(rpath), this.routerConfig.resourceFileName)
+    return path.join(
+      this.serverRouterConfig.resourceRoot,
+      this.getHttpPath(rpath),
+      this.serverRouterConfig.resourceFileName
+    )
   }
 
   protected getHandlersPath(rpath: string) {
-    return path.join(this.routerConfig.adapterRoot, this.getHttpPath(rpath), this.routerConfig.adapterFileName)
+    return path.join(
+      this.serverRouterConfig.adapterRoot,
+      this.getHttpPath(rpath),
+      this.serverRouterConfig.adapterFileName
+    )
   }
 }
 
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
-  constructor(fileRoot: string, httpPath: string = '/', routerOption: Partial<ServerRouterConfig> = {}) {
-    super(fileRoot, httpPath, routerOption)
+  constructor(fileRoot: string, httpPath: string = '/', serverRouterConfig: Partial<ServerRouterConfig> = {}) {
+    super(fileRoot, httpPath, serverRouterConfig)
     this.router = express.Router({ mergeParams: true })
   }
 
   sub(...args: any[]) {
-    const subRouter = new ServerRouter(this.fileRoot, path.join(this.httpPath, args[0]), this.routerConfig)
+    const subRouter = new ServerRouter(this.fileRoot, path.join(this.httpPath, args[0]), this.serverRouterConfig)
     ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
     return subRouter
   }
@@ -268,7 +275,7 @@ export class ServerRouter extends BasicRouter {
     const resource = await importAndSetup(
       this.fileRoot,
       resourcePath,
-      new ResourceSupport(this.fileRoot, this.routerConfig),
+      new ResourceSupport(this.fileRoot, this.serverRouterConfig),
       config
     )
 
@@ -276,14 +283,14 @@ export class ServerRouter extends BasicRouter {
     const adapter: MultiOptionAdapter = await importAndSetup(
       this.fileRoot,
       adapterPath,
-      new ActionSupport(this.fileRoot, this.routerConfig),
+      new ActionSupport(this.fileRoot, this.serverRouterConfig),
       config
     )
 
-    const actionDescriptors: readonly ActionDescriptor[] = config.actions || this.routerConfig.actions
+    const actionDescriptors: readonly ActionDescriptor[] = config.actions || this.serverRouterConfig.actions
 
-    for (const ad of actionDescriptors) {
-      const actionName = ad.action
+    for (const actionDescriptor of actionDescriptors) {
+      const actionName = actionDescriptor.action
 
       const resourceMethod: Function | undefined = resource[actionName]
       const actionFunc: Handler | MultiOptionResponder | undefined = adapter[actionName]
@@ -304,7 +311,8 @@ export class ServerRouter extends BasicRouter {
         )
       }
 
-      const defaultConstructDescriptor: ConstructDescriptor | undefined = this.routerConfig.constructConfig[actionName]
+      const defaultConstructDescriptor: ConstructDescriptor | undefined =
+        this.serverRouterConfig.constructConfig[actionName]
       let schema: z.AnyZodObject | undefined
       if (resourceMethod) {
         if (constructDescriptor?.schema === undefined) {
@@ -322,7 +330,7 @@ export class ServerRouter extends BasicRouter {
       const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
       let params
-      const urlPath = path.join(rpath, ad.path)
+      const urlPath = path.join(rpath, actionDescriptor.path)
       handlerLog(
         '%s#%s ConstructActionDescriptor: %s',
         adapterPath,
@@ -339,7 +347,6 @@ export class ServerRouter extends BasicRouter {
           } catch (err) {
             next(err)
           }
-          return
         }
 
         params = [handler]
@@ -353,20 +360,16 @@ export class ServerRouter extends BasicRouter {
           throw new Error('Unreachable: schema is undefined')
         }
 
-        const sources = constructDescriptor?.sources || defaultSources
-        const routerOption = this.routerConfig
-        const httpPath = this.getHttpPath(rpath)
-
         const handler: express.Handler = createResourceMethodHandler({
           resourceMethod,
           resource,
-          sources,
-          routerOption,
-          httpPath,
+          sources: constructDescriptor?.sources || defaultSources,
+          serverRouterConfig: this.serverRouterConfig,
+          httpPath: this.getHttpPath(rpath),
           schema,
           adapterPath,
-          ad,
-          actionFunc,
+          actionDescriptor,
+          responder: actionFunc,
           adapter,
         })
         params = [handler]
@@ -374,14 +377,14 @@ export class ServerRouter extends BasicRouter {
 
       routeLog(
         '%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}',
-        ad.method,
+        actionDescriptor.method,
         path.join(this.httpPath, urlPath),
         actionName,
         params.length !== 1,
         actionOverride,
         !!resourceMethod
       )
-      ;(this.router as any)[ad.method].apply(this.router, [urlPath, ...params])
+      ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
     }
   }
 }
@@ -401,13 +404,13 @@ export class ResourceHolderCreateRouter extends BasicRouter {
       this.resourcesHolder,
       this.fileRoot,
       path.join(this.httpPath, args[0]),
-      this.routerConfig
+      this.serverRouterConfig
     )
   }
 
   async resources(rpath: string, config: RouteConfig) {
     const resourcePath = this.getResourcePath(rpath)
-    const resourceSupport = new ResourceSupport(this.fileRoot, this.routerConfig)
+    const resourceSupport = new ResourceSupport(this.fileRoot, this.serverRouterConfig)
     const resource = await importAndSetup(this.fileRoot, resourcePath, resourceSupport, config)
 
     const resourceProxy: Record<string, Function> = {}

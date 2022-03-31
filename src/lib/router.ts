@@ -166,7 +166,7 @@ export type Adapter<O> = {
 export class RouterError extends Error {}
 
 export type CreateOptionsFunction = {
-  (req: express.Request, res: express.Response, httpPath: string, ad: ActionDescriptor): Promise<any[]>
+  (ctx: ActionContext, httpPath: string, ad: ActionDescriptor): Promise<any[]>
 }
 
 export type ServerRouterConfig = {
@@ -186,24 +186,15 @@ export type ServerRouterConfig = {
 export type InputArranger = (
   input: Record<string, any>,
   schema: z.ZodObject<any>,
-  req: express.Request,
-  res: express.Response
+  ctx: ActionContext
 ) => Record<string, any>
 
 export class ActionSupport {
-  constructor(readonly rootPath: string, readonly routerConfig: ServerRouterConfig) {}
-
-  input(req: express.Request): any {
-    return (req as any)[this.routerConfig.inputKey]
-  }
-
-  error(req: express.Request): ValidationError {
-    return (req as any)[this.routerConfig.errorKey]
-  }
+  constructor(readonly rootPath: string, readonly serverRouterConfig: ServerRouterConfig) {}
 }
 
 export class ResourceSupport {
-  constructor(readonly rootPath: string, readonly routerConfig: ServerRouterConfig) {}
+  constructor(readonly rootPath: string, readonly serverRouterConfig: ServerRouterConfig) {}
 }
 
 export function defineResource(callback: (support: ResourceSupport, config: RouteConfig) => Record<string, Function>) {
