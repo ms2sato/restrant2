@@ -19,6 +19,7 @@ import {
   Router,
   RouterError,
   ServerRouterConfig,
+  ConstructSource,
 } from './router'
 
 const log = debug('restrant2')
@@ -82,26 +83,85 @@ const smartInputArranger: InputArranger = (
   return input
 }
 
-const constructMiddleware = (
-  schema: z.ZodObject<any>,
-  sources: readonly string[],
+type ResourceMethodHandlerParams = {
+  resourceMethod: Function
+  resource: any
+  sources: readonly ConstructSource[]
   routerOption: ServerRouterConfig
-) => {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  httpPath: string
+  schema: z.AnyZodObject
+  adapterPath: string
+  ad: ActionDescriptor
+  actionFunc: MultiOptionResponder
+  adapter: MultiOptionAdapter
+}
+
+const createResourceMethodHandler = ({
+  resourceMethod,
+  resource,
+  sources,
+  routerOption,
+  httpPath,
+  schema,
+  adapterPath,
+  ad,
+  actionFunc,
+  adapter,
+}: ResourceMethodHandlerParams): express.Handler => {
+  const actionName = ad.action
+
+  return async (req, res, next) => {
+    const ctx = new ActionContext(req, res)
+    const options = await routerOption.createOptions(req, res, httpPath, ad)
     const source = routerOption.inputArranger(mergeSources(req, sources), schema, req, res)
-    ;(req as any)[routerOption.sourceKey] = source
 
     try {
       const input = schema.parse(source)
       routeLog('input', input)
-      ;(req as any)[routerOption.inputKey] = input
-      next()
+
+      const args = input ? [input, ...options] : options
+      handlerLog('resourceMethod args: %o', args)
+      const output = await resourceMethod.apply(resource, args)
+
+      if (actionFunc) {
+        handlerLog('%s#%s.success', adapterPath, actionName)
+        await actionFunc.success.apply(adapter, [ctx, output, ...options])
+      } else {
+        handlerLog('%s#%s success as json', adapterPath, actionName)
+        res.json({ status: 'success', data: output })
+      }
     } catch (err) {
       if (err instanceof z.ZodError) {
-        ;(req as any)[routerOption.errorKey] = err
-        next()
+        const validationError = err
+        handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
+        if (actionFunc) {
+          if (actionFunc.invalid) {
+            handlerLog('%s#%s.invalid', adapterPath, actionName)
+            res.status(422)
+            await actionFunc.invalid.apply(adapter, [ctx, validationError, source, ...options])
+          } else {
+            next(validationError)
+          }
+        } else {
+          handlerLog('%s#%s invalid as json', adapterPath, actionName)
+          res.status(422)
+          res.json({
+            status: 'error',
+            errors: validationError.errors,
+            message: validationError.message,
+          })
+        }
       } else {
-        next(err)
+        if (!actionFunc?.fatal) {
+          return next(err)
+        }
+
+        try {
+          handlerLog('%s#%s.fatal', adapterPath, actionName)
+          await actionFunc.fatal.apply(adapter, [ctx, err as Error, ...options])
+        } catch (er) {
+          next(er)
+        }
       }
     }
   }
@@ -233,19 +293,19 @@ export class ServerRouter extends BasicRouter {
       if (!actionOverride) {
         if (resourceMethod === undefined) {
           throw new RouterError(
-            `Handler not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
+            `Logic not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
           )
         }
       }
 
       if (actionOverride && resourceMethod) {
         routeLog.extend('warn')(
-          `${resourcePath}#${actionName} is defined but will not be called auto. PostHandler support auto call`
+          `${resourcePath}#${actionName} is defined but will not be called auto. Responder support auto call; proposal: 'Remove ${resourcePath}#${actionName}' or 'Change to Responder(not Function) ${adapterPath}/#${actionName}' or 'Remove ${adapterPath}/#${actionName}'`
         )
       }
 
       const defaultConstructDescriptor: ConstructDescriptor | undefined = this.routerConfig.constructConfig[actionName]
-      let schema: z.AnyZodObject | null = null
+      let schema: z.AnyZodObject | undefined
       if (resourceMethod) {
         if (constructDescriptor?.schema === undefined) {
           if (!defaultConstructDescriptor?.schema) {
@@ -261,10 +321,18 @@ export class ServerRouter extends BasicRouter {
 
       const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
-      const handler: express.Handler = async (req, res, next) => {
-        const ctx = new ActionContext(req, res)
-
-        if (actionFunc instanceof Function) {
+      let params
+      const urlPath = path.join(rpath, ad.path)
+      handlerLog(
+        '%s#%s ConstructActionDescriptor: %s',
+        adapterPath,
+        actionName,
+        constructDescriptor?.schema?.constructor.name
+      )
+      if (actionOverride) {
+        handlerLog('%s#%s without construct middleware', adapterPath, actionName)
+        const handler: express.Handler = async (req, res, next) => {
+          const ctx = new ActionContext(req, res)
           try {
             handlerLog('%s#%s as Handler', adapterPath, actionName)
             await actionFunc(ctx)
@@ -274,75 +342,33 @@ export class ServerRouter extends BasicRouter {
           return
         }
 
-        const options = await this.routerConfig.createOptions(req, res, this.getHttpPath(rpath), ad)
-
-        try {
-          const validationError = (req as any)[this.routerConfig.errorKey]
-          if (validationError) {
-            handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
-            if (actionFunc) {
-              if (actionFunc.invalid) {
-                handlerLog('%s#%s.invalid', adapterPath, actionName)
-                const source = (req as any)[this.routerConfig.sourceKey]
-                res.status(422)
-                await actionFunc.invalid.apply(adapter, [ctx, validationError, source, ...options])
-              } else {
-                next(validationError)
-              }
-            } else {
-              handlerLog('%s#%s invalid as json', adapterPath, actionName)
-              res.status(422)
-              res.json({
-                status: 'error',
-                errors: validationError.errors,
-                message: validationError.message,
-              })
-            }
-            return
-          }
-
-          const input = (req as any)[this.routerConfig.inputKey]
-          const args = input ? [input, ...options] : options
-          handlerLog('resourceMethod args: %o', args)
-          const output = await resourceMethod!.apply(resource, args)
-
-          if (actionFunc) {
-            handlerLog('%s#%s.success', adapterPath, actionName)
-            await actionFunc.success.apply(adapter, [ctx, output, ...options])
-          } else {
-            handlerLog('%s#%s success as json', adapterPath, actionName)
-            res.json({ status: 'success', data: output })
-          }
-        } catch (err) {
-          if (!actionFunc?.fatal) {
-            return next(err)
-          }
-
-          try {
-            handlerLog('%s#%s.fatal', adapterPath, actionName)
-            await actionFunc.fatal.apply(adapter, [ctx, err as Error, ...options])
-          } catch (er) {
-            next(er)
-          }
-        }
-      }
-
-      let params
-      const urlPath = path.join(rpath, ad.path)
-      handlerLog(
-        '%s#%s ConstructActionDescriptor: %s',
-        adapterPath,
-        actionName,
-        constructDescriptor?.schema?.constructor.name
-      )
-      if (resourceMethod) {
-        handlerLog('%s#%s with construct middleware', adapterPath, actionName)
-        params = [
-          constructMiddleware(schema!, constructDescriptor?.sources || defaultSources, this.routerConfig),
-          handler,
-        ]
+        params = [handler]
       } else {
-        handlerLog('%s#%s without construct middleware', adapterPath, actionName)
+        handlerLog('%s#%s with construct middleware', adapterPath, actionName)
+        if (!resourceMethod) {
+          throw new Error('Unreachable: resourceMethod is undefined')
+        }
+
+        if (!schema) {
+          throw new Error('Unreachable: schema is undefined')
+        }
+
+        const sources = constructDescriptor?.sources || defaultSources
+        const routerOption = this.routerConfig
+        const httpPath = this.getHttpPath(rpath)
+
+        const handler: express.Handler = createResourceMethodHandler({
+          resourceMethod,
+          resource,
+          sources,
+          routerOption,
+          httpPath,
+          schema,
+          adapterPath,
+          ad,
+          actionFunc,
+          adapter,
+        })
         params = [handler]
       }
 
