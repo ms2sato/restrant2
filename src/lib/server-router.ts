@@ -20,6 +20,7 @@ import {
   RouterError,
   ServerRouterConfig,
   ConstructSource,
+  RequestCallback,
 } from './router'
 
 const log = debug('restrant2')
@@ -34,6 +35,7 @@ export const idNumberSchema = z.object({
 })
 export type IdNumberParams = z.infer<typeof idNumberSchema>
 
+// for express-fileupload
 export const uploadedFileSchema = z.object({
   name: z.string(),
   mv: z.function().args(z.string()).returns(z.promise(z.void())),
@@ -45,7 +47,7 @@ export const uploadedFileSchema = z.object({
   md5: z.string(),
 })
 
-export type UploadedFileParams = z.infer<typeof uploadedFileSchema>
+export type UploadedFile = z.infer<typeof uploadedFileSchema>
 
 function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
   return {
@@ -69,9 +71,9 @@ const mergeSources = (ctx: ActionContext, sources: readonly string[]): Record<st
 }
 
 export const smartInputArranger: InputArranger = (
+  ctx: ActionContext,
   input: Record<string, any>,
-  schema: z.ZodObject<any>,
-  ctx: ActionContext
+  schema: z.ZodObject<any>
 ) => {
   for (const [key, val] of Object.entries(input)) {
     // TODO: for other type
@@ -91,7 +93,7 @@ type ResourceMethodHandlerParams = {
   schema: z.AnyZodObject
   adapterPath: string
   actionDescriptor: ActionDescriptor
-  responder: MultiOptionResponder
+  responder: MultiOptionResponder | RequestCallback
   adapter: MultiOptionAdapter
 }
 
@@ -112,17 +114,29 @@ const createResourceMethodHandler = ({
   return async (req, res, next) => {
     const ctx = new ActionContext(req, res)
     const options = await serverRouterConfig.createOptions(ctx, httpPath, actionDescriptor)
-    const source = serverRouterConfig.inputArranger(mergeSources(ctx, sources), schema, ctx)
+
+    let mergedBody = mergeSources(ctx, sources)
+    if ('beforeArrange' in responder) {
+      mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
+    }
+    let source = serverRouterConfig.inputArranger(ctx, mergedBody, schema)
 
     try {
-      const input = schema.parse(source)
+      if ('beforeValidation' in responder) {
+        source = await responder.beforeValidation!(ctx, source, schema, mergedBody)
+      }
+      
+      let input = schema.parse(source)
+      if ('afterValidation' in responder) {
+        input = await responder.afterValidation!(ctx, input, schema, mergedBody)
+      }
+  
       routeLog('input', input)
-
       const args = input ? [input, ...options] : options
       handlerLog('resourceMethod args: %o', args)
       const output = await resourceMethod.apply(resource, args)
 
-      if (responder) {
+      if ('success' in responder) {
         handlerLog('%s#%s.success', adapterPath, actionName)
         await responder.success.apply(adapter, [ctx, output, ...options])
       } else {
@@ -134,10 +148,10 @@ const createResourceMethodHandler = ({
         const validationError = err
         handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
         if (responder) {
-          if (responder.invalid) {
+          if ('invalid' in responder) {
             handlerLog('%s#%s.invalid', adapterPath, actionName)
             res.status(422)
-            await responder.invalid.apply(adapter, [ctx, validationError, source, ...options])
+            await responder.invalid!.apply(adapter, [ctx, validationError, source, ...options])
           } else {
             next(validationError)
           }
@@ -151,15 +165,15 @@ const createResourceMethodHandler = ({
           })
         }
       } else {
-        if (!responder?.fatal) {
+        if ('fatal' in responder) {
+          try {
+            handlerLog('%s#%s.fatal', adapterPath, actionName)
+            await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
+          } catch (er) {
+            next(er)
+          }
+        } else {
           return next(err)
-        }
-
-        try {
-          handlerLog('%s#%s.fatal', adapterPath, actionName)
-          await responder.fatal.apply(adapter, [ctx, err as Error, ...options])
-        } catch (er) {
-          next(er)
         }
       }
     }
@@ -207,9 +221,6 @@ export const importAndSetup = async (
 
 export function defaultServerRouterConfig(): ServerRouterConfig {
   return {
-    inputKey: 'input',
-    errorKey: 'validationError',
-    sourceKey: 'inputSource',
     actions: Actions.standard(),
     inputArranger: smartInputArranger,
     createOptions: createNullOptions,
@@ -293,7 +304,7 @@ export class ServerRouter extends BasicRouter {
       const actionName = actionDescriptor.action
 
       const resourceMethod: Function | undefined = resource[actionName]
-      const actionFunc: Handler | MultiOptionResponder | undefined = adapter[actionName]
+      const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
       const constructDescriptor: ConstructDescriptor | undefined = config.construct?.[actionName]
 
       const actionOverride = actionFunc instanceof Function

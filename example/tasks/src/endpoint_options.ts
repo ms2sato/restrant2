@@ -7,9 +7,9 @@ export type AcceptLanguageOption = {
   languages: string[]
 }
 
-export const createOptions: CreateOptionsFunction = async (req, res, httpPath, ad) => {
+export const createOptions: CreateOptionsFunction = async (ctx, httpPath, ad) => {
   debug('createOptions')
-  const acceptLanguage = req.headers['accept-language']
+  const acceptLanguage = ctx.req.headers['accept-language']
   const option: AcceptLanguageOption = {
     languages: acceptLanguage?.split(',') || [],
   }

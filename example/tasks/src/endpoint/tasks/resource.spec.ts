@@ -18,7 +18,7 @@ function callSetup(
   const setup = re.default
   const support: ResourceSupport = {
     rootPath,
-    routerConfig: serverRouterConfig,
+    serverRouterConfig,
   }
   const routeConfig: RouteConfig = { name }
   return setup(support, routeConfig)

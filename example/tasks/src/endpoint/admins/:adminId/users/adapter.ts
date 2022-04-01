@@ -2,6 +2,7 @@ import { defineAdapter } from 'restrant2'
 import { User } from './resource'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 import { globalUploadedFileCache } from '../../../../lib/upload'
+import { UserCreateParams } from '../../../../params'
 
 export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
   return {
@@ -17,21 +18,33 @@ export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
     },
 
     create: {
+      afterValidation: async (ctx, input: UserCreateParams) => {
+        if (!input.photo && input.photoCache) {
+          input.photo = await globalUploadedFileCache.load(input.photoCache)
+        }
+        return input
+      },
       success: async (ctx, output: User) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
       invalid: async (ctx, err, source) => {
-        const photoCache = source.photo ? await globalUploadedFileCache.cache(source.photo) : undefined
+        const photoCache = source.photo ? await globalUploadedFileCache.store(source.photo) : source.photoCache
         ctx.render('users/build', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },
 
     update: {
+      afterValidation: async (ctx, input: UserCreateParams) => {
+        if (!input.photo && input.photoCache) {
+          input.photo = await globalUploadedFileCache.load(input.photoCache)
+        }
+        return input
+      },
       success: async (ctx, output: User) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
       invalid: async (ctx, err, source) => {
-        const photoCache = source.photo ? await globalUploadedFileCache.cache(source.photo) : undefined
+        const photoCache = source.photo ? await globalUploadedFileCache.store(source.photo) : source.photoCache
         ctx.render('users/edit', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },

@@ -155,12 +155,18 @@ export type Responder<O> = {
   fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
 }
 
+export type RequestCallback = {
+  beforeArrange?: (ctx: ActionContext, mergedBody: any, schema: z.AnyZodObject) => any
+  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject, mergedBody: any) => any,
+  afterValidation?: (ctx: ActionContext, input: any, schema: z.AnyZodObject, mergedBody: any) => any
+}
+
 export type MultiOptionAdapter = {
-  [key: string]: Handler | MultiOptionResponder
+  [key: string]: Handler | MultiOptionResponder | RequestCallback
 }
 
 export type Adapter<O> = {
-  [key: string]: Handler | Responder<O>
+  [key: string]: Handler | Responder<O> | RequestCallback
 }
 
 export class RouterError extends Error {}
@@ -170,9 +176,6 @@ export type CreateOptionsFunction = {
 }
 
 export type ServerRouterConfig = {
-  inputKey: string
-  errorKey: string
-  sourceKey: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
   createOptions: CreateOptionsFunction
@@ -184,9 +187,9 @@ export type ServerRouterConfig = {
 }
 
 export type InputArranger = (
+  ctx: ActionContext,
   input: Record<string, any>,
-  schema: z.ZodObject<any>,
-  ctx: ActionContext
+  schema: z.ZodObject<any>
 ) => Record<string, any>
 
 export class ActionSupport {

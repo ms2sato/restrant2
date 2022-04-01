@@ -1,8 +1,8 @@
 import path from 'path'
 import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
-import { IdNumberParams, defineResource, UploadedFileParams } from 'restrant2'
+import { IdNumberParams, defineResource, UploadedFile } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
-import { globalUploadedFileCache, save } from '../../../../lib/upload'
+import { save } from '../../../../lib/upload'
 
 export type User = {
   id: number
@@ -29,7 +29,7 @@ export default defineResource((support, options) => {
 
   const resourceRoot = path.join(support.rootPath, '../uploaded')
 
-  const saveFile = (uploadedFile: UploadedFileParams) => {
+  const saveFile = (uploadedFile: UploadedFile) => {
     return save(uploadedFile, resourceRoot)
   }
 
@@ -48,8 +48,6 @@ export default defineResource((support, options) => {
 
       if (photo) {
         user.photo = await saveFile(photo)
-      } else if (photoCache) {
-        user.photo = globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(user.id, user)
@@ -66,8 +64,6 @@ export default defineResource((support, options) => {
 
       if (photo) {
         user.photo = await saveFile(photo)
-      } else if (photoCache) {
-        user.photo = globalUploadedFileCache.switchDir(resourceRoot, photoCache)
       }
 
       users.set(id, user)
