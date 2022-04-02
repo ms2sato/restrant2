@@ -125,12 +125,12 @@ const createResourceMethodHandler = ({
       if ('beforeValidation' in responder) {
         source = await responder.beforeValidation!(ctx, source, schema, mergedBody)
       }
-      
+
       let input = schema.parse(source)
       if ('afterValidation' in responder) {
         input = await responder.afterValidation!(ctx, input, schema, mergedBody)
       }
-  
+
       routeLog('input', input)
       const args = input ? [input, ...options] : options
       handlerLog('resourceMethod args: %o', args)
@@ -237,8 +237,8 @@ export abstract class BasicRouter implements Router {
 
   constructor(
     readonly fileRoot: string,
-    readonly httpPath: string = '/',
-    serverRouterConfig: Partial<ServerRouterConfig> = {}
+    serverRouterConfig: Partial<ServerRouterConfig> = {},
+    readonly httpPath: string = '/'
   ) {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
@@ -270,13 +270,13 @@ export abstract class BasicRouter implements Router {
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
-  constructor(fileRoot: string, httpPath: string = '/', serverRouterConfig: Partial<ServerRouterConfig> = {}) {
-    super(fileRoot, httpPath, serverRouterConfig)
+  constructor(fileRoot: string, serverRouterConfig: Partial<ServerRouterConfig> = {}, httpPath: string = '/') {
+    super(fileRoot, serverRouterConfig, httpPath)
     this.router = express.Router({ mergeParams: true })
   }
 
   sub(...args: any[]) {
-    const subRouter = new ServerRouter(this.fileRoot, path.join(this.httpPath, args[0]), this.serverRouterConfig)
+    const subRouter = new ServerRouter(this.fileRoot, this.serverRouterConfig, path.join(this.httpPath, args[0]))
     ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
     return subRouter
   }
@@ -404,18 +404,18 @@ export class ResourceHolderCreateRouter extends BasicRouter {
   constructor(
     private resourcesHolder: any,
     fileRoot: string,
-    httpPath: string = '/',
-    routerOption: Partial<ServerRouterConfig> = {}
+    routerOption: Partial<ServerRouterConfig> = {},
+    httpPath: string = '/'
   ) {
-    super(fileRoot, httpPath, routerOption)
+    super(fileRoot, routerOption, httpPath)
   }
 
   sub(...args: any[]) {
     return new ResourceHolderCreateRouter(
       this.resourcesHolder,
       this.fileRoot,
-      path.join(this.httpPath, args[0]),
-      this.serverRouterConfig
+      this.serverRouterConfig,
+      path.join(this.httpPath, args[0])
     )
   }
 

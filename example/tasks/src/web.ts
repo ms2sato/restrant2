@@ -71,7 +71,7 @@ export async function setup() {
     }
   })
 
-  const router: ServerRouter = new ServerRouter(__dirname, '/', {
+  const router: ServerRouter = new ServerRouter(__dirname, {
     createOptions,
   })
   app.use(router.router)
