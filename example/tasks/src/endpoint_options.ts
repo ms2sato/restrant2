@@ -7,7 +7,8 @@ export type AcceptLanguageOption = {
   languages: string[]
 }
 
-export const createOptions: CreateOptionsFunction = async (ctx, httpPath, ad) => {
+// eslint-disable-next-line @typescript-eslint/require-await
+export const createOptions: CreateOptionsFunction = async (ctx, _httpPath, _ad) => {
   debug('createOptions')
   const acceptLanguage = ctx.req.headers['accept-language']
   const option: AcceptLanguageOption = {

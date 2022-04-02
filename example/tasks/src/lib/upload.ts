@@ -28,21 +28,12 @@ export class UploadedFileCache {
     return key
   }
 
-  async load(key: string) {
+  load(key: string) {
     const uploadedFile = this.key2Metadata.get(key)
     if (!uploadedFile) {
       throw new Error(`Cache metadata not found: ${key}`)
     }
     return new CachedUploadedFile(this, key, uploadedFile)
-  }
-
-  switchDir(to: string, key: string): string {
-    const cachePath = path.join(this.cacheDir, key)
-    if (!fs.existsSync(cachePath)) {
-      throw new Error(`Cached file lost: ${cachePath}`)
-    }
-    fs.renameSync(cachePath, path.join(to, key))
-    return key
   }
 
   fullPath(key: string) {
@@ -54,11 +45,13 @@ export class CachedUploadedFile implements UploadedFile {
   constructor(public uploadedFileCache: UploadedFileCache, private key: string, private metadata: UploadedFile) {}
 
   get data() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.metadata.data
   }
   get name() {
     return this.metadata.name
   }
+  // eslint-disable-next-line @typescript-eslint/require-await
   async mv(to: string) {
     fs.renameSync(this.tempFilePath, to)
   }

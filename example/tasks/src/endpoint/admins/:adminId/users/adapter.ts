@@ -2,74 +2,76 @@ import { defineAdapter } from 'restrant2'
 import { User } from './resource'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 import { globalUploadedFileCache } from '../../../../lib/upload'
-import { UserCreateParams } from '../../../../params'
+import { UserCreateParams, UserUpdateParams } from '../../../../params'
 
 export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig) => {
   return {
     index: {
-      success: async (ctx, output: User[], option) =>
-        ctx.render('users/index', { users: output, admin: { id: Number(ctx.params.adminId) }, ...option }),
+      success: (ctx, output: User[], option) => {
+        ctx.render('users/index', { users: output, admin: { id: Number(ctx.params.adminId) }, ...option })
+      },
     },
 
-    build: (ctx) => ctx.render('users/build', { data: { adminId: ctx.params.adminId } }),
+    build: (ctx) => ctx.render('users/build', { data: { adminId: Number(ctx.params.adminId) } }),
 
     edit: {
-      success: async (ctx, output: User, option) => ctx.render('users/edit', { data: output, ...option }),
+      success: (ctx, output: User, option) => ctx.render('users/edit', { data: output, ...option }),
     },
 
     create: {
-      afterValidation: async (ctx, input: UserCreateParams) => {
+      afterValidation: (ctx, input: UserCreateParams) => {
         if (!input.photo && input.photoCache) {
-          input.photo = await globalUploadedFileCache.load(input.photoCache)
+          input.photo = globalUploadedFileCache.load(input.photoCache)
         }
         return input
       },
-      success: async (ctx, output: User) => {
+      success: (ctx, output: User) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
-      invalid: async (ctx, err, source) => {
+      invalid: async (ctx, err, source: Partial<UserCreateParams>) => {
         const photoCache = source.photo ? await globalUploadedFileCache.store(source.photo) : source.photoCache
         ctx.render('users/build', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },
 
     update: {
-      afterValidation: async (ctx, input: UserCreateParams) => {
+      afterValidation: (ctx, input: UserUpdateParams) => {
         if (!input.photo && input.photoCache) {
-          input.photo = await globalUploadedFileCache.load(input.photoCache)
+          input.photo = globalUploadedFileCache.load(input.photoCache)
         }
         return input
       },
-      success: async (ctx, output: User) => {
+      success: (ctx, output: User) => {
         ctx.redirect(`/admins/${output.adminId}/users`)
       },
-      invalid: async (ctx, err, source) => {
+      invalid: async (ctx, err, source: Partial<UserUpdateParams>) => {
         const photoCache = source.photo ? await globalUploadedFileCache.store(source.photo) : source.photoCache
         ctx.render('users/edit', { data: { ...source, photo: undefined, photoCache }, err })
       },
     },
 
     destroy: {
-      success: async (ctx, output) => {
+      success: (ctx) => {
         ctx.redirect('/users')
       },
     },
 
     photo: {
-      success: async (ctx, output: string | null) => {
+      success: (ctx, output: string | null) => {
         if (!output) {
           ctx.res.send('Photo not found')
           return
         }
-        await ctx.res.sendFile(output)
+        ctx.res.sendFile(output)
       },
     },
 
-    photoCache: async (ctx) => {
+    photoCache: (ctx) => {
       if (!ctx.params.key) {
+        // TODO: error code 400
         throw new Error('Unexpected access')
       }
-      await ctx.res.sendFile(globalUploadedFileCache.fullPath(ctx.params.key))
+      ctx.res.sendFile(globalUploadedFileCache.fullPath(ctx.params.key))
     },
   }
 })

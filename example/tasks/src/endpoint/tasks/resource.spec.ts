@@ -14,6 +14,7 @@ function callSetup(
     serverRouterConfig: defaultServerRouterConfig(),
     name: `${Math.random()}`,
   }
+  // eslint-disable-next-line @typescript-eslint/ban-types
 ): Record<string, Function> {
   const setup = re.default
   const support: ResourceSupport = {
@@ -28,6 +29,7 @@ test('index', () => {
   const resourceMethods = callSetup()
   expect(resourceMethods.index).toBeInstanceOf(Function)
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.index()
 
   expect(output).toEqual([
@@ -44,6 +46,7 @@ test('create', () => {
     title: 'title1',
     description: 'description1',
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.create(params)
 
   expect(output).toEqual({
@@ -63,6 +66,7 @@ test('update', () => {
     description: 'test-edit',
     id: 2,
   }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.update(params)
 
   expect(output).toEqual({
@@ -77,6 +81,7 @@ test('destroy', () => {
   const resourceMethods = callSetup()
   expect(resourceMethods.destroy).toBeInstanceOf(Function)
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.destroy({
     id: 2,
   })
@@ -95,6 +100,7 @@ test('done', () => {
   const resourceMethods = callSetup()
   expect(resourceMethods.done).toBeInstanceOf(Function)
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.done({
     id: 2,
   })

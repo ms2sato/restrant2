@@ -11,7 +11,7 @@ export type User = {
   adminId: number
 }
 
-export default defineResource((support, options) => {
+export default defineResource((support, _options) => {
   const users: Map<number, User> = new Map([
     [1, { id: 1, name: 'test1', adminId: 1 }],
     [2, { id: 2, name: 'test2', adminId: 1 }],
@@ -34,20 +34,17 @@ export default defineResource((support, options) => {
   }
 
   return {
-    index: (option: AcceptLanguageOption) => {
-      return Array.from(users, ([id, data]) => data)
+    index: (_option: AcceptLanguageOption) => {
+      return Array.from(users, ([_id, data]) => data)
     },
 
     create: async (params: UserCreateParams) => {
-      const { photo, photoCache, ...data } = params
+      const { photo, ...data } = params
 
       const user: User = {
         ...data,
         id: ++lastId,
-      }
-
-      if (photo) {
-        user.photo = await saveFile(photo)
+        photo: photo ? await saveFile(photo) : undefined,
       }
 
       users.set(user.id, user)
@@ -59,9 +56,9 @@ export default defineResource((support, options) => {
     },
 
     update: async (params: UserUpdateParams) => {
-      const { id, photo, photoCache, ...data } = params
-      const user = { ...get(id), ...data }
+      const { id, photo, ...data } = params
 
+      const user = { ...get(id), ...data }
       if (photo) {
         user.photo = await saveFile(photo)
       }

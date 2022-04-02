@@ -2,6 +2,10 @@ import request from 'supertest'
 import { Application } from 'express'
 import { setup } from '../../web'
 
+type ResponseHeaders = {
+  location: string
+}
+
 let app: Application
 beforeAll(async () => {
   app = await setup()
@@ -38,7 +42,7 @@ test('POST /', async () => {
       description: 'description1',
     })
     expect(response.statusCode).toBe(302)
-    expect(response.headers.location).toBe('/tasks')
+    expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }
 
   {
@@ -56,7 +60,7 @@ test('PATCH /:id', async () => {
       description: 'description1-edit',
     })
     expect(response.statusCode).toBe(302)
-    expect(response.headers.location).toBe('/tasks')
+    expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }
 
   {
@@ -72,7 +76,7 @@ test('DELETE /:id', async () => {
       id: 1,
     })
     expect(response.statusCode).toBe(302)
-    expect(response.headers.location).toBe('/tasks')
+    expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }
 
   {
@@ -91,7 +95,7 @@ test('POST /:id/done', async () => {
   {
     const response = await request(app).post('/tasks/2/done').send({})
     expect(response.statusCode).toBe(302)
-    expect(response.headers.location).toBe('/tasks')
+    expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }
 
   {

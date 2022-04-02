@@ -16,6 +16,33 @@ process.on('uncaughtException', (err) => {
 
 const debug = createDebug('tasks:params')
 
+const useMethodOverride = (app: express.Application) => {
+  type BodyType = {
+    _method?: string
+  }
+
+  const methodName = '_method'
+
+  // @see http://expressjs.com/en/resources/middleware/method-override.html
+  app.use(
+    methodOverride(function (req, _res) {
+      if (req.body && typeof req.body === 'object' && methodName in req.body) {
+        const body = req.body as BodyType
+        const method = body[methodName]
+        if (!method) {
+          throw new Error('Unreachable')
+        }
+        // look in urlencoded POST bodies and delete it
+        delete body[methodName]
+        return method
+      }
+      return req.method
+    })
+  )
+
+  app.use(methodOverride(methodName, { methods: ['GET', 'POST'] })) // for GET Parameter
+}
+
 export async function setup() {
   const app = express()
 
@@ -31,19 +58,7 @@ export async function setup() {
     })
   )
 
-  // @see http://expressjs.com/en/resources/middleware/method-override.html
-  app.use(
-    methodOverride(function (req, _res) {
-      if (req.body && typeof req.body === 'object' && '_method' in req.body) {
-        // look in urlencoded POST bodies and delete it
-        const method = req.body._method
-        delete req.body._method
-        return method
-      }
-    })
-  )
-
-  app.use(methodOverride('_method', { methods: ['GET', 'POST'] })) // for GET Parameter
+  useMethodOverride(app)
 
   app.use((req, res, next) => {
     debug(`${req.method} ${req.path}`)

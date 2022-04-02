@@ -141,23 +141,23 @@ export class ActionContext {
   }
 }
 
-export type Handler = (ctx: ActionContext) => void
+export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
-  success: (ctx: ActionContext, output: any, ...options: any) => Promise<void>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, ...options: any) => Promise<void>
+  success: (ctx: ActionContext, output: any, ...options: any) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, ...options: any) => void | Promise<void>
 }
 
 export type Responder<O> = {
-  success: (ctx: ActionContext, output: any, option: O) => Promise<void>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: any, option: O) => Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, option: O) => Promise<void>
+  success: (ctx: ActionContext, output: any, option: O) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: any, option: O) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, option: O) => void | Promise<void>
 }
 
 export type RequestCallback = {
   beforeArrange?: (ctx: ActionContext, mergedBody: any, schema: z.AnyZodObject) => any
-  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject, mergedBody: any) => any,
+  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject, mergedBody: any) => any
   afterValidation?: (ctx: ActionContext, input: any, schema: z.AnyZodObject, mergedBody: any) => any
 }
 
