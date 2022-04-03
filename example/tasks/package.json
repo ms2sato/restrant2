@@ -15,7 +15,8 @@
     "link": "npm link ../../../restrant2",
     "eslint": "npx eslint ./src",
     "eslint:fix": "npx eslint ./src --fix",
-    "format": "npx prettier --write 'src/**/*.{js,ts,json}'"
+    "format": "npx prettier --write 'src/**/*.{js,ts,json}'",
+    "check-types": "npx tsc --noEmit"
   },
   "keywords": [],
   "author": "ms2sato",

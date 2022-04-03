@@ -75,7 +75,8 @@ export async function setup() {
     createOptions,
   })
   app.use(router.router)
-  await routes(router)
+  routes(router)
+  await router.build()
 
   app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(err.stack)

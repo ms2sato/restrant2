@@ -29,7 +29,7 @@ export type RouteConfig = {
 
 export interface Router {
   sub(...args: any[]): Router
-  resources(path: string, config: RouteConfig): Promise<void>
+  resources(path: string, config: RouteConfig): void
 }
 
 export namespace Actions {

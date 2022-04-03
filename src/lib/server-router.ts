@@ -232,19 +232,36 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
   }
 }
 
+type HandlerBuildRunner = {
+  (): Promise<void>
+}
+
 export abstract class BasicRouter implements Router {
   protected readonly serverRouterConfig: ServerRouterConfig
 
   constructor(
     readonly fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
-    readonly httpPath: string = '/'
+    readonly httpPath: string = '/',
+    protected readonly handlerBuildRunners: HandlerBuildRunner[] = []
   ) {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
 
   abstract sub(...args: any[]): Router
-  abstract resources(rpath: string, config: RouteConfig): Promise<void>
+  protected abstract createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner
+
+  resources(rpath: string, config: RouteConfig): void {
+    this.handlerBuildRunners.push(this.createHandlerBuildRunner(rpath, config))
+  }
+
+  async build() {
+    console.log('build', this.handlerBuildRunners)
+    for (const requestHandlerSources of this.handlerBuildRunners) {
+      console.log('build rooping')
+      await requestHandlerSources()
+    }
+  }
 
   protected getHttpPath(rpath: string) {
     return path.join(this.httpPath, rpath)
@@ -270,132 +287,146 @@ export abstract class BasicRouter implements Router {
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
-  constructor(fileRoot: string, serverRouterConfig: Partial<ServerRouterConfig> = {}, httpPath: string = '/') {
-    super(fileRoot, serverRouterConfig, httpPath)
+  constructor(
+    fileRoot: string,
+    serverRouterConfig: Partial<ServerRouterConfig> = {},
+    httpPath: string = '/',
+    handlerBuildRunners: HandlerBuildRunner[] = []
+  ) {
+    super(fileRoot, serverRouterConfig, httpPath, handlerBuildRunners)
     this.router = express.Router({ mergeParams: true })
   }
 
   sub(...args: any[]) {
-    const subRouter = new ServerRouter(this.fileRoot, this.serverRouterConfig, path.join(this.httpPath, args[0]))
+    const subRouter = new ServerRouter(
+      this.fileRoot,
+      this.serverRouterConfig,
+      path.join(this.httpPath, args[0]),
+      this.handlerBuildRunners
+    )
     ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
     return subRouter
   }
 
-  async resources(rpath: string, config: RouteConfig) {
-    const resourcePath = this.getResourcePath(rpath)
-    const resource = await importAndSetup(
-      this.fileRoot,
-      resourcePath,
-      new ResourceSupport(this.fileRoot, this.serverRouterConfig),
-      config
-    )
+  protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
+    return async () => {
+      console.log('buildHandler', rpath, config)
 
-    const adapterPath = this.getHandlersPath(rpath)
-    const adapter: MultiOptionAdapter = await importAndSetup(
-      this.fileRoot,
-      adapterPath,
-      new ActionSupport(this.fileRoot, this.serverRouterConfig),
-      config
-    )
+      const resourcePath = this.getResourcePath(rpath)
+      const resource = await importAndSetup(
+        this.fileRoot,
+        resourcePath,
+        new ResourceSupport(this.fileRoot, this.serverRouterConfig),
+        config
+      )
 
-    const actionDescriptors: readonly ActionDescriptor[] = config.actions || this.serverRouterConfig.actions
+      const adapterPath = this.getHandlersPath(rpath)
+      const adapter: MultiOptionAdapter = await importAndSetup(
+        this.fileRoot,
+        adapterPath,
+        new ActionSupport(this.fileRoot, this.serverRouterConfig),
+        config
+      )
 
-    for (const actionDescriptor of actionDescriptors) {
-      const actionName = actionDescriptor.action
+      const actionDescriptors: readonly ActionDescriptor[] = config.actions || this.serverRouterConfig.actions
 
-      const resourceMethod: Function | undefined = resource[actionName]
-      const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
-      const constructDescriptor: ConstructDescriptor | undefined = config.construct?.[actionName]
+      for (const actionDescriptor of actionDescriptors) {
+        const actionName = actionDescriptor.action
 
-      const actionOverride = actionFunc instanceof Function
-      if (!actionOverride) {
-        if (resourceMethod === undefined) {
-          throw new RouterError(
-            `Logic not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
+        const resourceMethod: Function | undefined = resource[actionName]
+        const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
+        const constructDescriptor: ConstructDescriptor | undefined = config.construct?.[actionName]
+
+        const actionOverride = actionFunc instanceof Function
+        if (!actionOverride) {
+          if (resourceMethod === undefined) {
+            throw new RouterError(
+              `Logic not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
+            )
+          }
+        }
+
+        if (actionOverride && resourceMethod) {
+          routeLog.extend('warn')(
+            `${resourcePath}#${actionName} is defined but will not be called auto. Responder support auto call; proposal: 'Remove ${resourcePath}#${actionName}' or 'Change to Responder(not Function) ${adapterPath}/#${actionName}' or 'Remove ${adapterPath}/#${actionName}'`
           )
         }
-      }
 
-      if (actionOverride && resourceMethod) {
-        routeLog.extend('warn')(
-          `${resourcePath}#${actionName} is defined but will not be called auto. Responder support auto call; proposal: 'Remove ${resourcePath}#${actionName}' or 'Change to Responder(not Function) ${adapterPath}/#${actionName}' or 'Remove ${adapterPath}/#${actionName}'`
-        )
-      }
-
-      const defaultConstructDescriptor: ConstructDescriptor | undefined =
-        this.serverRouterConfig.constructConfig[actionName]
-      let schema: z.AnyZodObject | undefined
-      if (resourceMethod) {
-        if (constructDescriptor?.schema === undefined) {
-          if (!defaultConstructDescriptor?.schema) {
-            throw new Error(`construct.${actionName}.schema not found in routes for ${resourcePath}#${actionName}`)
-          }
-          schema = defaultConstructDescriptor.schema
-        } else if (constructDescriptor.schema === null) {
-          schema = blankSchema
-        } else {
-          schema = constructDescriptor.schema
-        }
-      }
-
-      const defaultSources = defaultConstructDescriptor?.sources || ['params']
-
-      let params
-      const urlPath = path.join(rpath, actionDescriptor.path)
-      handlerLog(
-        '%s#%s ConstructActionDescriptor: %s',
-        adapterPath,
-        actionName,
-        constructDescriptor?.schema?.constructor.name
-      )
-      if (actionOverride) {
-        handlerLog('%s#%s without construct middleware', adapterPath, actionName)
-        const handler: express.Handler = async (req, res, next) => {
-          const ctx = new ActionContext(req, res)
-          try {
-            handlerLog('%s#%s as Handler', adapterPath, actionName)
-            await actionFunc(ctx)
-          } catch (err) {
-            next(err)
+        const defaultConstructDescriptor: ConstructDescriptor | undefined =
+          this.serverRouterConfig.constructConfig[actionName]
+        let schema: z.AnyZodObject | undefined
+        if (resourceMethod) {
+          if (constructDescriptor?.schema === undefined) {
+            if (!defaultConstructDescriptor?.schema) {
+              throw new Error(`construct.${actionName}.schema not found in routes for ${resourcePath}#${actionName}`)
+            }
+            schema = defaultConstructDescriptor.schema
+          } else if (constructDescriptor.schema === null) {
+            schema = blankSchema
+          } else {
+            schema = constructDescriptor.schema
           }
         }
 
-        params = [handler]
-      } else {
-        handlerLog('%s#%s with construct middleware', adapterPath, actionName)
-        if (!resourceMethod) {
-          throw new Error('Unreachable: resourceMethod is undefined')
-        }
+        const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
-        if (!schema) {
-          throw new Error('Unreachable: schema is undefined')
-        }
-
-        const handler: express.Handler = createResourceMethodHandler({
-          resourceMethod,
-          resource,
-          sources: constructDescriptor?.sources || defaultSources,
-          serverRouterConfig: this.serverRouterConfig,
-          httpPath: this.getHttpPath(rpath),
-          schema,
+        let params
+        const urlPath = path.join(rpath, actionDescriptor.path)
+        handlerLog(
+          '%s#%s ConstructActionDescriptor: %s',
           adapterPath,
-          actionDescriptor,
-          responder: actionFunc,
-          adapter,
-        })
-        params = [handler]
-      }
+          actionName,
+          constructDescriptor?.schema?.constructor.name
+        )
+        if (actionOverride) {
+          handlerLog('%s#%s without construct middleware', adapterPath, actionName)
+          const handler: express.Handler = async (req, res, next) => {
+            const ctx = new ActionContext(req, res)
+            try {
+              handlerLog('%s#%s as Handler', adapterPath, actionName)
+              await actionFunc(ctx)
+            } catch (err) {
+              next(err)
+            }
+          }
 
-      routeLog(
-        '%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}',
-        actionDescriptor.method,
-        path.join(this.httpPath, urlPath),
-        actionName,
-        params.length !== 1,
-        actionOverride,
-        !!resourceMethod
-      )
-      ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
+          params = [handler]
+        } else {
+          handlerLog('%s#%s with construct middleware', adapterPath, actionName)
+          if (!resourceMethod) {
+            throw new Error('Unreachable: resourceMethod is undefined')
+          }
+
+          if (!schema) {
+            throw new Error('Unreachable: schema is undefined')
+          }
+
+          const handler: express.Handler = createResourceMethodHandler({
+            resourceMethod,
+            resource,
+            sources: constructDescriptor?.sources || defaultSources,
+            serverRouterConfig: this.serverRouterConfig,
+            httpPath: this.getHttpPath(rpath),
+            schema,
+            adapterPath,
+            actionDescriptor,
+            responder: actionFunc,
+            adapter,
+          })
+          params = [handler]
+        }
+
+        routeLog(
+          '%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}',
+          actionDescriptor.method,
+          path.join(this.httpPath, urlPath),
+          actionName,
+          params.length !== 1,
+          actionOverride,
+          !!resourceMethod
+        )
+        ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
+      }
     }
   }
 }
@@ -419,27 +450,29 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     )
   }
 
-  async resources(rpath: string, config: RouteConfig) {
-    const resourcePath = this.getResourcePath(rpath)
-    const resourceSupport = new ResourceSupport(this.fileRoot, this.serverRouterConfig)
-    const resource = await importAndSetup(this.fileRoot, resourcePath, resourceSupport, config)
+  protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
+    return async () => {
+      const resourcePath = this.getResourcePath(rpath)
+      const resourceSupport = new ResourceSupport(this.fileRoot, this.serverRouterConfig)
+      const resource = await importAndSetup(this.fileRoot, resourcePath, resourceSupport, config)
 
-    const resourceProxy: Record<string, Function> = {}
-    for (let actionName in resource) {
-      const resourceMethod = resource[actionName]
-      const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
-      if (cad?.schema) {
-        resourceProxy[actionName] = function () {
-          const [input, ...options] = Array.from(arguments)
-          return resourceMethod.apply(resource, cad.schema?.parse(input), options)
+      const resourceProxy: Record<string, Function> = {}
+      for (let actionName in resource) {
+        const resourceMethod = resource[actionName]
+        const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
+        if (cad?.schema) {
+          resourceProxy[actionName] = function () {
+            const [input, ...options] = Array.from(arguments)
+            return resourceMethod.apply(resource, cad.schema?.parse(input), options)
+          }
+        } else {
+          resourceProxy[actionName] = function () {
+            return resourceMethod.apply(resource, arguments)
+          }
         }
-      } else {
-        resourceProxy[actionName] = function () {
-          return resourceMethod.apply(resource, arguments)
-        }
+
+        this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
       }
-
-      this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
     }
   }
 }

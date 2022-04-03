@@ -7,8 +7,8 @@ import {
 } from './params'
 import { idNumberSchema, Router, Actions } from 'restrant2'
 
-export async function routes(router: Router) {
-  await router.resources('/tasks', {
+export function routes(router: Router) {
+  router.resources('/tasks', {
     construct: {
       create: { schema: taskCreateSchema },
       update: { schema: taskUpdateSchema },
@@ -19,7 +19,7 @@ export async function routes(router: Router) {
   })
 
   const adminRouter = router.sub('/admins/:adminId')
-  await adminRouter.resources('/users', {
+  adminRouter.resources('/users', {
     name: 'admin_user',
     construct: {
       edit: { schema: adminWithIdNumberSchema },
