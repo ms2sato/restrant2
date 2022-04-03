@@ -256,9 +256,7 @@ export abstract class BasicRouter implements Router {
   }
 
   async build() {
-    console.log('build', this.handlerBuildRunners)
     for (const requestHandlerSources of this.handlerBuildRunners) {
-      console.log('build rooping')
       await requestHandlerSources()
     }
   }
@@ -298,6 +296,7 @@ export class ServerRouter extends BasicRouter {
   }
 
   sub(...args: any[]) {
+    // TODO: impl class SubServerRouter without build
     const subRouter = new ServerRouter(
       this.fileRoot,
       this.serverRouterConfig,
@@ -309,6 +308,24 @@ export class ServerRouter extends BasicRouter {
   }
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
+    const choiceSchema = (
+      constructDescriptor: ConstructDescriptor | undefined,
+      defaultConstructDescriptor: ConstructDescriptor,
+      actionName: string,
+      resourcePath: string
+    ) => {
+      if (constructDescriptor?.schema === undefined) {
+        if (!defaultConstructDescriptor?.schema) {
+          throw new Error(`construct.${actionName}.schema not found in routes for ${resourcePath}#${actionName}`)
+        }
+        return defaultConstructDescriptor.schema
+      } else if (constructDescriptor.schema === null) {
+        return blankSchema
+      } else {
+        return constructDescriptor.schema
+      }
+    }
+
     return async () => {
       console.log('buildHandler', rpath, config)
 
@@ -354,19 +371,9 @@ export class ServerRouter extends BasicRouter {
 
         const defaultConstructDescriptor: ConstructDescriptor | undefined =
           this.serverRouterConfig.constructConfig[actionName]
-        let schema: z.AnyZodObject | undefined
-        if (resourceMethod) {
-          if (constructDescriptor?.schema === undefined) {
-            if (!defaultConstructDescriptor?.schema) {
-              throw new Error(`construct.${actionName}.schema not found in routes for ${resourcePath}#${actionName}`)
-            }
-            schema = defaultConstructDescriptor.schema
-          } else if (constructDescriptor.schema === null) {
-            schema = blankSchema
-          } else {
-            schema = constructDescriptor.schema
-          }
-        }
+        const schema: z.AnyZodObject | undefined = resourceMethod
+          ? choiceSchema(constructDescriptor, defaultConstructDescriptor, actionName, resourcePath)
+          : undefined
 
         const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
