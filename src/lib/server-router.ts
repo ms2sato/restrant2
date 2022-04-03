@@ -275,7 +275,7 @@ export abstract class BasicRouter implements Router {
     )
   }
 
-  protected getHandlersPath(rpath: string) {
+  protected getAdapterPath(rpath: string) {
     return path.join(
       this.serverRouterConfig.adapterRoot,
       this.getHttpPath(rpath),
@@ -320,7 +320,7 @@ export class ServerRouter extends BasicRouter {
         config
       )
 
-      const adapterPath = this.getHandlersPath(rpath)
+      const adapterPath = this.getAdapterPath(rpath)
       const adapter: MultiOptionAdapter = await importAndSetup(
         this.fileRoot,
         adapterPath,
