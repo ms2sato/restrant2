@@ -327,7 +327,7 @@ export class ServerRouter extends BasicRouter {
     }
 
     return async () => {
-      console.log('buildHandler', rpath, config)
+      handlerLog('buildHandler: %s', path.join(this.httpPath, rpath))
 
       const resourcePath = this.getResourcePath(rpath)
       const resource = await importAndSetup(
@@ -379,12 +379,6 @@ export class ServerRouter extends BasicRouter {
 
         let params
         const urlPath = path.join(rpath, actionDescriptor.path)
-        handlerLog(
-          '%s#%s ConstructActionDescriptor: %s',
-          adapterPath,
-          actionName,
-          constructDescriptor?.schema?.constructor.name
-        )
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
@@ -399,7 +393,6 @@ export class ServerRouter extends BasicRouter {
 
           params = [handler]
         } else {
-          handlerLog('%s#%s with construct middleware', adapterPath, actionName)
           if (!resourceMethod) {
             throw new Error('Unreachable: resourceMethod is undefined')
           }
@@ -408,10 +401,19 @@ export class ServerRouter extends BasicRouter {
             throw new Error('Unreachable: schema is undefined')
           }
 
+          const sources = constructDescriptor?.sources || defaultSources
+          handlerLog(
+            '%s#%s  with construct middleware; schema: %s, sources: %o',
+            adapterPath,
+            actionName,
+            schema.constructor.name,
+            sources
+          )
+
           const handler: express.Handler = createResourceMethodHandler({
             resourceMethod,
             resource,
-            sources: constructDescriptor?.sources || defaultSources,
+            sources,
             serverRouterConfig: this.serverRouterConfig,
             httpPath: this.getHttpPath(rpath),
             schema,
@@ -424,11 +426,10 @@ export class ServerRouter extends BasicRouter {
         }
 
         routeLog(
-          '%s %s\t%s\t{validate:%s, actionOverride:%s, resourceMethod:%s}',
+          '%s %s\t%s\t{actionOverride:%s, resourceMethod:%s}',
           actionDescriptor.method,
           path.join(this.httpPath, urlPath),
           actionName,
-          params.length !== 1,
           actionOverride,
           !!resourceMethod
         )
