@@ -58,7 +58,7 @@ describe('array node', () => {
     })
   })
 
-  // TODO: 
+  // TODO:
   // test('array blanks deep path', () => {
   //   expect(parse({ 'user.hobbies[].name': ['guitar', 'piano'] })).toEqual({
   //     user: { hobbies: [{ name: 'guitar' }, { name: 'piano' }] },

@@ -1,8 +1,33 @@
-function parsePath(paths:string[], node: Record<string, any>, value: any, pathIndex: number = 0) {
-  const path = paths.shift()
-  if(path === undefined) return
-  
-  const valueLength = value instanceof Array ? value.length : 0
+export type TraverseArranger = {
+  next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void
+  nextItem: (name: string, node: Record<string, any>, value: any, pathIndex: number) => void
+  arrangeIndexedArrayOnLast: (name: string, node: Record<string, any>, value: any, pathIndex: number) => any | undefined
+  arrangePropertyOnLast: (path: string, node: Record<string, any>, value: any, pathIndex: number) => any | undefined
+}
+
+export type TraverseArrangerCreator = {
+  (): TraverseArranger
+}
+
+export function nullTraverseArranger() {
+  return {
+    next() {},
+    nextItem() {},
+    arrangeIndexedArrayOnLast() {},
+    arrangePropertyOnLast() {},
+  }
+}
+
+function traversePath(
+  arranger: TraverseArranger,
+  paths: string[],
+  node: Record<string, any>,
+  value: any,
+  pathIndex: number = 0
+) {
+  if (paths.length === 0) return
+
+  const path = paths.shift()!
 
   const arrayFirst = path.indexOf('[')
   const arrayLast = path.indexOf(']')
@@ -36,18 +61,23 @@ function parsePath(paths:string[], node: Record<string, any>, value: any, pathIn
       }
 
       if (paths.length === pathIndex) {
-        node[name][index] = value
+        arranger.next(name, node, value, pathIndex)
+        node[name][index] = arranger.arrangeIndexedArrayOnLast(name, node, value, pathIndex) || value
       } else {
         if (node[name][index] === undefined) {
           node[name][index] = {}
         }
-        parsePath(paths, node[name][index], value, pathIndex++)
+        arranger.nextItem(name, node, value, pathIndex)
+        traversePath(arranger, paths, node[name][index], value, pathIndex++)
       }
     } else {
       // format: name[]
 
+      arranger.next(name, node, value, pathIndex)
       if (paths.length === pathIndex) {
-        node[name] = valueLength === 0 ? [value] : value
+        const valueLength = value instanceof Array ? value.length : 0
+        const array = valueLength === 0 ? [value] : value
+        node[name] = array
       } else {
         const obj = {}
         if (node[name] === undefined) {
@@ -55,7 +85,7 @@ function parsePath(paths:string[], node: Record<string, any>, value: any, pathIn
         } else {
           node[name].push(obj)
         }
-        parsePath(paths, obj, value, pathIndex++)
+        traversePath(arranger, paths, obj, value, pathIndex++)
       }
     }
 
@@ -64,21 +94,21 @@ function parsePath(paths:string[], node: Record<string, any>, value: any, pathIn
     throw new Error(`'[' and ']' must be provide in pairs : ${path}`)
   }
 
+  arranger.next(path, node, value, pathIndex)
   if (node[path] === undefined) {
     node[path] = {}
   }
   if (paths.length === pathIndex) {
-    node[path] = value
+    node[path] = arranger.arrangePropertyOnLast(path, node, value, pathIndex) || value
   } else {
-    parsePath(paths, node[path], value, pathIndex++)
+    traversePath(arranger, paths, node[path], value, pathIndex++)
   }
 }
 
-
-export function parse(body: Record<string, any>): any {
+export function parse(body: Record<string, any>, arrangerCreator: TraverseArrangerCreator = nullTraverseArranger): any {
   const ret: Record<string, any> = {}
   for (const [key, value] of Object.entries(body)) {
-    parsePath(key.split('.'), ret, value)
+    traversePath(arrangerCreator(), key.split('.'), ret, value)
   }
   return ret
 }
