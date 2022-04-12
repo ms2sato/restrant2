@@ -21,7 +21,9 @@ import {
   ServerRouterConfig,
   ConstructSource,
   RequestCallback,
-} from './router'
+  parse,
+  createZodTraverseArrangerCreator,
+} from '../index'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -75,13 +77,7 @@ export const smartInputArranger: InputArranger = (
   input: Record<string, any>,
   schema: z.ZodObject<any>
 ) => {
-  for (const [key, val] of Object.entries(input)) {
-    // TODO: for other type
-    if (schema.shape[key] instanceof z.ZodNumber) {
-      input[key] = Number(val)
-    }
-  }
-  return input
+  return parse(input, createZodTraverseArrangerCreator(schema))
 }
 
 type ResourceMethodHandlerParams = {
