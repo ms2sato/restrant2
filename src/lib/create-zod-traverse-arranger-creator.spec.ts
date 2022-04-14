@@ -14,6 +14,7 @@ const userSchema = z.object({
   numbers: z.array(z.number()),
   hobbies: z.array(z.string()),
   items: z.array(itemSchema),
+  numbersHasDefault: z.array(z.number()).default([]),
 })
 
 export type User = z.infer<typeof userSchema>
@@ -31,18 +32,18 @@ describe('zod', () => {
     })
   })
   test('value string[]', () => {
-    expect(parse({ name: 'MyName', hobbies: ['guitar', 'piano'] }, arrangerCreator)).toEqual({
+    expect(parse({ name: 'MyName', 'hobbies[]': ['guitar', 'piano'] }, arrangerCreator)).toEqual({
       name: 'MyName',
       hobbies: ['guitar', 'piano'],
     })
   })
-  test('value number[]', () => {
-    expect(parse({ name: 'MyName', numbers: ['12', '23'] }, arrangerCreator)).toEqual({
+  test('cast array string to number', () => {
+    expect(parse({ name: 'MyName', 'numbers[]': ['12', '23'] }, arrangerCreator)).toEqual({
       name: 'MyName',
       numbers: [12, 23],
     })
   })
-  test('value number[index]', () => {
+  test('value number[index]=value', () => {
     expect(parse({ name: 'MyName', 'numbers[0]': '12', 'numbers[1]': '23' }, arrangerCreator)).toEqual({
       name: 'MyName',
       numbers: [12, 23],
@@ -59,6 +60,12 @@ describe('zod', () => {
           number: 23,
         },
       ],
+    })
+  })
+  test('default', () => {
+    expect(parse({ name: 'MyName', 'numbersHasDefault[]': ['12', '23'] }, arrangerCreator)).toEqual({
+      name: 'MyName',
+      numbersHasDefault: [12, 23],
     })
   })
 })

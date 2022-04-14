@@ -5,20 +5,42 @@ export function createZodTraverseArrangerCreator(schema: z.AnyZodObject): Traver
   return () => new ZodArranger(schema)
 }
 
+function stripDefault(schema: z.AnyZodObject) {
+  if (schema instanceof z.ZodDefault) {
+    return (schema._def as any).innerType
+  }
+  return schema
+}
+
 export class ZodArranger implements TraverseArranger {
   constructor(private schema: z.AnyZodObject) {}
 
   next(path: string, node: Record<string, any>, value: any, pathIndex: number): void {
-    this.schema = this.schema.shape[path]
+    this.schema = stripDefault(this.schema.shape[path])
   }
 
   nextItem(name: string, node: Record<string, any>, value: any, pathIndex: number): void {
-    this.schema = this.schema.shape[name].element
+    let parentSchema = stripDefault(this.schema.shape[name])
+    this.schema = stripDefault(parentSchema.element)
   }
 
-  arrangeIndexedArrayOnLast(name: string, node: Record<string, any>, value: any, pathIndex: number) {
-    if (this.schema instanceof z.ZodArray) {
-      return this.cast(this.schema.element, value)
+  arrangeIndexedArrayItemOnLast(name: string, node: Record<string, any>, value: any, pathIndex: number) {
+    if (this.isArraySchema()) {
+      return this.cast(this.elementSchema(), value)
+    }
+  }
+
+  arrangeUnindexedArrayOnLast(
+    name: string,
+    node: Record<string, any>,
+    value: any[],
+    pathIndex: number
+  ): any | undefined {
+    if (this.isArraySchema()) {
+      return this.castArray(this.elementSchema(), value)
+    } else {
+      console.error(this.schema, name, value)
+      throw new Error(`Unexpected Type: ${this.schema}`)
     }
   }
 
@@ -28,9 +50,18 @@ export class ZodArranger implements TraverseArranger {
       return casted
     }
 
-    if (this.schema instanceof z.ZodArray) {
-      return this.castArray(this.schema.element, value)
+    return value
+  }
+
+  private isArraySchema() {
+    return this.schema instanceof z.ZodArray
+  }
+
+  private elementSchema() {
+    if (!(this.schema instanceof z.ZodArray)) {
+      throw new Error('Must be array schema')
     }
+    return this.schema.element
   }
 
   private castArray(elementSchema: z.AnyZodObject, value: any) {

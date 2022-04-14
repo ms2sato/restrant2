@@ -110,12 +110,33 @@ const createResourceMethodHandler = ({
   return async (req, res, next) => {
     const ctx = new ActionContext(req, res)
     const options = await serverRouterConfig.createOptions(ctx, httpPath, actionDescriptor)
-
-    let mergedBody = mergeSources(ctx, sources)
-    if ('beforeArrange' in responder) {
-      mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
+    const handleFatal = async (err: Error) => {
+      if ('fatal' in responder) {
+        try {
+          handlerLog('%s#%s.fatal', adapterPath, actionName)
+          await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
+        } catch (er) {
+          next(er)
+        }
+      } else {
+        return next(err)
+      }
     }
-    let source = serverRouterConfig.inputArranger(ctx, mergedBody, schema)
+
+    let mergedBody
+    let source
+
+    try {
+      mergedBody = mergeSources(ctx, sources)
+      if ('beforeArrange' in responder) {
+        mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
+      }
+      handlerLog('mergedBody: %o', mergedBody)
+      source = serverRouterConfig.inputArranger(ctx, mergedBody, schema)
+      handlerLog('source: %o', source)
+    } catch (err) {
+      return handleFatal(err as Error)
+    }
 
     try {
       if ('beforeValidation' in responder) {
@@ -161,16 +182,7 @@ const createResourceMethodHandler = ({
           })
         }
       } else {
-        if ('fatal' in responder) {
-          try {
-            handlerLog('%s#%s.fatal', adapterPath, actionName)
-            await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
-          } catch (er) {
-            next(er)
-          }
-        } else {
-          return next(err)
-        }
+        handleFatal(err as Error)
       }
     }
   }

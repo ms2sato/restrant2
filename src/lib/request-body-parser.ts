@@ -1,7 +1,18 @@
 export type TraverseArranger = {
   next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void
   nextItem: (name: string, node: Record<string, any>, value: any, pathIndex: number) => void
-  arrangeIndexedArrayOnLast: (name: string, node: Record<string, any>, value: any, pathIndex: number) => any | undefined
+  arrangeIndexedArrayItemOnLast: (
+    name: string,
+    node: Record<string, any>,
+    value: any,
+    pathIndex: number
+  ) => any | undefined
+  arrangeUnindexedArrayOnLast: (
+    name: string,
+    node: Record<string, any>,
+    value: any[],
+    pathIndex: number
+  ) => any | undefined
   arrangePropertyOnLast: (path: string, node: Record<string, any>, value: any, pathIndex: number) => any | undefined
 }
 
@@ -13,102 +24,98 @@ export function nullTraverseArranger() {
   return {
     next() {},
     nextItem() {},
-    arrangeIndexedArrayOnLast() {},
+    arrangeIndexedArrayItemOnLast() {},
+    arrangeUnindexedArrayOnLast() {},
     arrangePropertyOnLast() {},
   }
 }
 
-function traversePath(
-  arranger: TraverseArranger,
-  paths: string[],
-  node: Record<string, any>,
-  value: any,
-  pathIndex: number = 0
-) {
-  if (paths.length === 0) return
+function createTraverser(arranger: TraverseArranger, key: string) {
+  function traversePath(paths: string[], node: Record<string, any>, value: any, pathIndex: number = 0) {
+    if (paths.length === 0) return
 
-  const path = paths.shift()!
+    const path = paths.shift()!
 
-  const arrayFirst = path.indexOf('[')
-  const arrayLast = path.indexOf(']')
+    const arrayFirst = path.indexOf('[')
+    const arrayLast = path.indexOf(']')
 
-  if (arrayFirst !== -1) {
-    if (arrayFirst === 0) {
-      throw new Error(`'[' must not be first character in path: ${path}`)
-    }
+    if (arrayFirst !== -1) {
+      if (arrayFirst === 0) {
+        throw new Error(`'[' must not be first character in path: ${path}`)
+      }
 
-    if (arrayLast === -1) {
+      if (arrayLast === -1) {
+        throw new Error(`'[' and ']' must be provide in pairs : ${path}`)
+      }
+
+      if (arrayLast !== path.length - 1) {
+        throw new Error(`']' must be last character in path: ${path}`)
+      }
+
+      const name = path.substring(0, arrayFirst)
+      const indexStr = path.substring(arrayFirst + 1, arrayLast)
+
+      if (indexStr.length !== 0) {
+        // format: name[index]
+
+        const index = Number(indexStr)
+        if (isNaN(index)) {
+          throw new Error(`index must be number : ${path}`)
+        }
+
+        if (node[name] === undefined) {
+          node[name] = []
+        }
+
+        if (paths.length === pathIndex) {
+          arranger.next(name, node, value, pathIndex)
+          node[name][index] = arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex) || value
+        } else {
+          if (node[name][index] === undefined) {
+            node[name][index] = {}
+          }
+          arranger.nextItem(name, node, value, pathIndex)
+          traversePath(paths, node[name][index], value, pathIndex++)
+        }
+      } else {
+        // format: name[]
+
+        arranger.next(name, node, value, pathIndex)
+        if (paths.length === pathIndex) {
+          const valueLength = value instanceof Array ? value.length : 0
+          const array = valueLength === 0 ? [value] : value
+          node[name] = arranger.arrangeUnindexedArrayOnLast(name, node, array, pathIndex) || array
+        } else {
+          throw new Error('Unimplemented')
+        }
+      }
+
+      return
+    } else if (arrayLast !== -1) {
       throw new Error(`'[' and ']' must be provide in pairs : ${path}`)
     }
 
-    if (arrayLast !== path.length - 1) {
-      throw new Error(`']' must be last character in path: ${path}`)
+    arranger.next(path, node, value, pathIndex)
+    if (node[path] === undefined) {
+      node[path] = {}
     }
-
-    const name = path.substring(0, arrayFirst)
-    const indexStr = path.substring(arrayFirst + 1, arrayLast)
-
-    if (indexStr.length !== 0) {
-      // format: name[index]
-
-      const index = Number(indexStr)
-      if (isNaN(index)) {
-        throw new Error(`index must be number : ${path}`)
+    if (paths.length === pathIndex) {
+      if (value instanceof Array) {
+        throw new Error(`Unexpected array input for single property name[${key}]: proposal '${path}[]'?`)
       }
-
-      if (node[name] === undefined) {
-        node[name] = []
-      }
-
-      if (paths.length === pathIndex) {
-        arranger.next(name, node, value, pathIndex)
-        node[name][index] = arranger.arrangeIndexedArrayOnLast(name, node, value, pathIndex) || value
-      } else {
-        if (node[name][index] === undefined) {
-          node[name][index] = {}
-        }
-        arranger.nextItem(name, node, value, pathIndex)
-        traversePath(arranger, paths, node[name][index], value, pathIndex++)
-      }
+      node[path] = arranger.arrangePropertyOnLast(path, node, value, pathIndex) || value
     } else {
-      // format: name[]
-
-      arranger.next(name, node, value, pathIndex)
-      if (paths.length === pathIndex) {
-        const valueLength = value instanceof Array ? value.length : 0
-        const array = valueLength === 0 ? [value] : value
-        node[name] = array
-      } else {
-        const obj = {}
-        if (node[name] === undefined) {
-          node[name] = [obj]
-        } else {
-          node[name].push(obj)
-        }
-        traversePath(arranger, paths, obj, value, pathIndex++)
-      }
+      traversePath(paths, node[path], value, pathIndex++)
     }
-
-    return
-  } else if (arrayLast !== -1) {
-    throw new Error(`'[' and ']' must be provide in pairs : ${path}`)
   }
 
-  arranger.next(path, node, value, pathIndex)
-  if (node[path] === undefined) {
-    node[path] = {}
-  }
-  if (paths.length === pathIndex) {
-    node[path] = arranger.arrangePropertyOnLast(path, node, value, pathIndex) || value
-  } else {
-    traversePath(arranger, paths, node[path], value, pathIndex++)
-  }
+  return traversePath
 }
 
 export function parse(body: Record<string, any>, arrangerCreator: TraverseArrangerCreator = nullTraverseArranger): any {
   const ret: Record<string, any> = {}
   for (const [key, value] of Object.entries(body)) {
-    traversePath(arrangerCreator(), key.split('.'), ret, value)
+    createTraverser(arrangerCreator(), key)(key.split('.'), ret, value)
   }
   return ret
 }

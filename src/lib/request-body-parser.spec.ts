@@ -6,7 +6,7 @@ describe('simple', () => {
   })
 
   test('array', () => {
-    expect(parse({ hobbies: ['guitar', 'piano'] })).toEqual({ hobbies: ['guitar', 'piano'] })
+    expect(parse({ 'hobbies[]': ['guitar', 'piano'] })).toEqual({ hobbies: ['guitar', 'piano'] })
   })
 })
 
@@ -16,17 +16,17 @@ describe('nested', () => {
   })
 
   test('array', () => {
-    expect(parse({ 'user.hobbies': ['guitar', 'piano'] })).toEqual({ user: { hobbies: ['guitar', 'piano'] } })
+    expect(parse({ 'user.hobbies[]': ['guitar', 'piano'] })).toEqual({ user: { hobbies: ['guitar', 'piano'] } })
   })
 
   test('deep', () => {
-    expect(parse({ 'group.user.name': 'MyName', 'group.user.hobbies': ['guitar', 'piano'] })).toEqual({
+    expect(parse({ 'group.user.name': 'MyName', 'group.user.hobbies[]': ['guitar', 'piano'] })).toEqual({
       group: { user: { name: 'MyName', hobbies: ['guitar', 'piano'] } },
     })
   })
 
   test('multiple root', () => {
-    expect(parse({ 'member.user.name': 'MyName', 'group.user.hobbies': ['guitar', 'piano'] })).toEqual({
+    expect(parse({ 'member.user.name': 'MyName', 'group.user.hobbies[]': ['guitar', 'piano'] })).toEqual({
       member: { user: { name: 'MyName' } },
       group: { user: { hobbies: ['guitar', 'piano'] } },
     })
@@ -58,12 +58,14 @@ describe('array node', () => {
     })
   })
 
-  // TODO:
-  // test('array blanks deep path', () => {
-  //   expect(parse({ 'user.hobbies[].name': ['guitar', 'piano'] })).toEqual({
-  //     user: { hobbies: [{ name: 'guitar' }, { name: 'piano' }] },
-  //   })
-  // })
+  test('array must have "[]"', () => {
+    expect(() => parse({ 'user.hobbies': ['guitar', 'piano'] })).toThrow(Error) // TODO: ParseError
+  })
+
+  test('array blanks deep path', () => {
+    // TODO: Unimplemented
+    expect(() => parse({ 'user.hobbies[].name': ['guitar', 'piano'] })).toThrow(Error)
+  })
 
   test('array deep path', () => {
     expect(

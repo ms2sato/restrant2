@@ -16,10 +16,18 @@ export const taskCreateSchema = z.object(taskCoreProps)
 
 export type TaskCreateParams = z.infer<typeof taskCreateSchema>
 
+const phaseSchema = z.object({
+  title: z.string(),
+  point: z.number(),
+  subtasks: z.array(z.number()).default([]),
+})
+
 export const taskUpdateSchema = z.object({
   id: z.number(),
   ...taskCoreProps,
   done: z.boolean().optional(),
+  subtasks: z.array(z.number()).default([]),
+  phases: z.array(phaseSchema),
 })
 
 export type TaskUpdateParams = z.infer<typeof taskUpdateSchema>

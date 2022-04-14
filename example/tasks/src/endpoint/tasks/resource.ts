@@ -6,12 +6,46 @@ export type Task = {
   title: string
   description: string
   done: boolean
+  subtasks: number[]
+  phases: Phase[]
+}
+
+type Phase = {
+  title: string
+  point: number
+  subtasks: number[]
 }
 
 export default defineResource((_support, _routeConfig) => {
   const tasks: Map<number, Task> = new Map([
-    [1, { id: 1, title: 'test1', description: 'test', done: false }],
-    [2, { id: 2, title: 'test2', description: 'test', done: false }],
+    [
+      1,
+      {
+        id: 1,
+        title: 'test1',
+        description: 'test',
+        done: false,
+        subtasks: [1],
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
+      },
+    ],
+    [
+      2,
+      {
+        id: 2,
+        title: 'test2',
+        description: 'test',
+        done: false,
+        subtasks: [],
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
+      },
+    ],
   ])
 
   let lastId = 2
@@ -34,6 +68,11 @@ export default defineResource((_support, _routeConfig) => {
         ...params,
         id: ++lastId,
         done: false,
+        subtasks: [],
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
       }
       tasks.set(task.id, task)
       return task
