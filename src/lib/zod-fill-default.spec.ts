@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { fill } from './zod-default-filler'
+import { fillDefault } from './zod-fill-default'
 
 const itemSchema = z.object({
   type: z.string().default('test'),
@@ -19,15 +19,15 @@ const userSchema = z.object({
 })
 
 test('simple', () => {
-  expect(fill({}, userSchema)).toEqual({ age: 20, numbersHasDefault: [] })
+  expect(fillDefault({}, userSchema)).toEqual({ age: 20, numbersHasDefault: [] })
 })
 
 test('not overwite', () => {
-  expect(fill({ age: 10, numbersHasDefault: [1] }, userSchema)).toEqual({ age: 10, numbersHasDefault: [1] })
+  expect(fillDefault({ age: 10, numbersHasDefault: [1] }, userSchema)).toEqual({ age: 10, numbersHasDefault: [1] })
 })
 
 test('nested object', () => {
-  expect(fill({ item: {} }, userSchema)).toEqual({
+  expect(fillDefault({ item: {} }, userSchema)).toEqual({
     age: 20,
     numbersHasDefault: [],
     item: { type: 'test', numbersHasDefault: [] },
@@ -35,7 +35,7 @@ test('nested object', () => {
 })
 
 test('nested array', () => {
-  expect(fill({ items: [{}] }, userSchema)).toEqual({
+  expect(fillDefault({ items: [{}] }, userSchema)).toEqual({
     age: 20,
     numbersHasDefault: [],
     items: [{ type: 'test', numbersHasDefault: [] }],

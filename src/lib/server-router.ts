@@ -23,6 +23,7 @@ import {
   RequestCallback,
   parse,
   createZodTraverseArrangerCreator,
+  fillDefault,
 } from '../index'
 
 const log = debug('restrant2')
@@ -166,9 +167,10 @@ const createResourceMethodHandler = ({
         handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
         if (responder) {
           if ('invalid' in responder) {
-            handlerLog('%s#%s.invalid', adapterPath, actionName)
+            const filledSource = fillDefault(source, schema)
+            handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
             res.status(422)
-            await responder.invalid!.apply(adapter, [ctx, validationError, source, ...options])
+            await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
           } else {
             next(validationError)
           }

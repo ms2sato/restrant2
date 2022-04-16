@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-function doFill(obj: any, schema: z.AnyZodObject) {
+function fill(obj: any, schema: z.AnyZodObject) {
   for (const [key, subSchema] of Object.entries(schema.shape)) {
     if (key in obj) {
       if (obj[key] instanceof Array) {
@@ -9,7 +9,7 @@ function doFill(obj: any, schema: z.AnyZodObject) {
         }
 
         for (const item of obj[key]) {
-          doFill(item, subSchema.element)
+          fill(item, subSchema.element)
         }
         continue
       }
@@ -18,7 +18,7 @@ function doFill(obj: any, schema: z.AnyZodObject) {
           continue
         }
 
-        doFill(obj[key], subSchema)
+        fill(obj[key], subSchema)
         continue
       }
       continue
@@ -33,6 +33,6 @@ function doFill(obj: any, schema: z.AnyZodObject) {
   return obj
 }
 
-export function fill(obj: any, schema: z.AnyZodObject): any {
-  return doFill(obj, schema)
+export function fillDefault(obj: any, schema: z.AnyZodObject): any {
+  return fill(obj, schema)
 }
