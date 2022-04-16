@@ -24,35 +24,22 @@ mixin form(action, method, phase = false)
         input(type="checkbox", name="subtasks[]", value="2", checked=task.subtasks.includes(2))
         | subtask2
 
-    if phase
-      fieldset 
-        legend phase0
-        div
-          label title:
-            input(name="phases[0].title", value=task.phases[0].title)
-        div    
-          label point:
-            input(name="phases[0].point", type="number", value=task.phases[0].point)
-        label
-          input(type="checkbox", name="phases[0].subtasks[]", value="1", checked=task.phases[0].subtasks.includes(1))
-          | subtask1
-        label
-          input(type="checkbox", name="phases[0].subtasks[]", value="2", checked=task.phases[0].subtasks.includes(2))
-          | subtask2
-      fieldset  
-        legend phase1
-        div
-          label title:
-            input(name="phases[1].title", value=task.phases[1].title)
-        div    
-          label point:
-            input(name="phases[1].point", type="number", value=task.phases[1].point)
-        label
-          input(type="checkbox", name="phases[1].subtasks[]", value="1", checked=task.phases[1].subtasks.includes(1))
-          | subtask1
-        label
-          input(type="checkbox", name="phases[1].subtasks[]", value="2", checked=task.phases[1].subtasks.includes(2))
-          | subtask2
+    if task.phases && task.phases.length > 0
+      each phase, index in task.phases
+        fieldset 
+          legend=phase.title || 'new phase'
+          div
+            label title:
+              input(name=`phases[${index}].title`, value=phase.title)
+          div    
+            label point:
+              input(name=`phases[${index}].point`, type="number", value=phase.point)
+          label
+            input(type="checkbox", name=`phases[${index}].subtasks[]`, value="1", checked=phase.subtasks.includes(1))
+            | subtask1
+          label
+            input(type="checkbox", name=`phases[${index}].subtasks[]`, value="2", checked=phase.subtasks.includes(2))
+            | subtask2
 
     div  
       input(type="submit")

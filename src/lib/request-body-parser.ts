@@ -1,3 +1,17 @@
+export type ArrangeResult =
+  | {
+      arranged: true
+      result: any
+    }
+  | {
+      arranged: false
+      result: undefined
+    }
+
+const nullArrangeResult = { arranged: false, result: undefined }
+
+export { nullArrangeResult }
+
 export type TraverseArranger = {
   next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void
   nextItem: (name: string, node: Record<string, any>, value: any, pathIndex: number) => void
@@ -6,14 +20,14 @@ export type TraverseArranger = {
     node: Record<string, any>,
     value: any,
     pathIndex: number
-  ) => any | undefined
+  ) => ArrangeResult
   arrangeUnindexedArrayOnLast: (
     name: string,
     node: Record<string, any>,
     value: any[],
     pathIndex: number
-  ) => any | undefined
-  arrangePropertyOnLast: (path: string, node: Record<string, any>, value: any, pathIndex: number) => any | undefined
+  ) => ArrangeResult
+  arrangePropertyOnLast: (path: string, node: Record<string, any>, value: any, pathIndex: number) => ArrangeResult
 }
 
 export type TraverseArrangerCreator = {
@@ -24,10 +38,20 @@ export function nullTraverseArranger() {
   return {
     next() {},
     nextItem() {},
-    arrangeIndexedArrayItemOnLast() {},
-    arrangeUnindexedArrayOnLast() {},
-    arrangePropertyOnLast() {},
+    arrangeIndexedArrayItemOnLast() {
+      return nullArrangeResult
+    },
+    arrangeUnindexedArrayOnLast() {
+      return nullArrangeResult
+    },
+    arrangePropertyOnLast() {
+      return nullArrangeResult
+    },
   }
+}
+
+function arrangedResultOrRaw({arranged, result}: ArrangeResult, value: any) {
+  return arranged ? result : value
 }
 
 function createTraverser(arranger: TraverseArranger, key: string) {
@@ -69,7 +93,7 @@ function createTraverser(arranger: TraverseArranger, key: string) {
 
         if (paths.length === pathIndex) {
           arranger.next(name, node, value, pathIndex)
-          node[name][index] = arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex) || value
+          node[name][index] = arrangedResultOrRaw(arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex), value)
         } else {
           if (node[name][index] === undefined) {
             node[name][index] = {}
@@ -84,7 +108,7 @@ function createTraverser(arranger: TraverseArranger, key: string) {
         if (paths.length === pathIndex) {
           const valueLength = value instanceof Array ? value.length : 0
           const array = valueLength === 0 ? [value] : value
-          node[name] = arranger.arrangeUnindexedArrayOnLast(name, node, array, pathIndex) || array
+          node[name] = arrangedResultOrRaw(arranger.arrangeUnindexedArrayOnLast(name, node, array, pathIndex), array)
         } else {
           throw new Error('Unimplemented')
         }
@@ -103,7 +127,8 @@ function createTraverser(arranger: TraverseArranger, key: string) {
       if (value instanceof Array) {
         throw new Error(`Unexpected array input for single property name[${key}]: proposal '${path}[]'?`)
       }
-      node[path] = arranger.arrangePropertyOnLast(path, node, value, pathIndex) || value
+
+      node[path] = arrangedResultOrRaw(arranger.arrangePropertyOnLast(path, node, value, pathIndex), value)
     } else {
       traversePath(paths, node[path], value, pathIndex++)
     }

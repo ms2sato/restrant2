@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { TraverseArranger, TraverseArrangerCreator } from './request-body-parser'
+import { TraverseArranger, TraverseArrangerCreator, ArrangeResult, nullArrangeResult } from './request-body-parser'
 
 export function createZodTraverseArrangerCreator(schema: z.AnyZodObject): TraverseArrangerCreator {
   return () => new ZodArranger(schema)
@@ -24,18 +24,14 @@ export class ZodArranger implements TraverseArranger {
     this.schema = stripDefault(parentSchema.element)
   }
 
-  arrangeIndexedArrayItemOnLast(name: string, node: Record<string, any>, value: any, pathIndex: number) {
+  arrangeIndexedArrayItemOnLast(name: string, node: Record<string, any>, value: any, pathIndex: number): ArrangeResult {
     if (this.isArraySchema()) {
       return this.cast(this.elementSchema(), value)
     }
+    return nullArrangeResult
   }
 
-  arrangeUnindexedArrayOnLast(
-    name: string,
-    node: Record<string, any>,
-    value: any[],
-    pathIndex: number
-  ): any | undefined {
+  arrangeUnindexedArrayOnLast(name: string, node: Record<string, any>, value: any[], pathIndex: number): ArrangeResult {
     if (this.isArraySchema()) {
       return this.castArray(this.elementSchema(), value)
     } else {
@@ -44,13 +40,12 @@ export class ZodArranger implements TraverseArranger {
     }
   }
 
-  arrangePropertyOnLast(path: string, node: Record<string, any>, value: any, pathIndex: number) {
-    const casted = this.cast(this.schema, value)
-    if (casted) {
-      return casted
+  arrangePropertyOnLast(path: string, node: Record<string, any>, value: any, pathIndex: number): ArrangeResult {
+    const result = this.cast(this.schema, value)
+    if (result.arranged) {
+      return result
     }
-
-    return value
+    return nullArrangeResult
   }
 
   private isArraySchema() {
@@ -65,20 +60,26 @@ export class ZodArranger implements TraverseArranger {
   }
 
   private castArray(elementSchema: z.AnyZodObject, value: any) {
-    return value.map((item: any) => {
-      return this.cast(elementSchema, item)
-    })
+    return {
+      arranged: true,
+      result: value.map((item: any) => {
+        const { result } = this.cast(elementSchema, item)
+        return result
+      }),
+    }
   }
 
-  private cast(schema: z.AnyZodObject, value: any) {
+  private cast(schema: z.AnyZodObject, value: any): ArrangeResult {
     if (schema instanceof z.ZodNumber) {
-      return Number(value)
+      return { arranged: true, result: Number(value) }
     }
     if (schema instanceof z.ZodDate) {
-      return new Date(value)
+      return { arranged: true, result: new Date(value) }
     }
     if (schema instanceof z.ZodString) {
-      return value.toString()
+      if (value === '') return { arranged: true, result: null }
+      return { arranged: true, result: value.toString() }
     }
+    return nullArrangeResult
   }
 }
