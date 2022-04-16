@@ -17,8 +17,6 @@ const userSchema = z.object({
   numbersHasDefault: z.array(z.number()).default([]),
 })
 
-export type User = z.infer<typeof userSchema>
-
 const arrangerCreator = createZodTraverseArrangerCreator(userSchema)
 
 test('value number', () => {
