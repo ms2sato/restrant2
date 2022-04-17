@@ -1,6 +1,7 @@
 import request from 'supertest'
 import { Application } from 'express'
 import { setup } from '../../web'
+import { TaskModel } from '../../models/task-model'
 
 type ResponseHeaders = {
   location: string
@@ -9,6 +10,7 @@ type ResponseHeaders = {
 let app: Application
 beforeAll(async () => {
   app = await setup()
+  TaskModel.reset()
 })
 
 test('GET /', async () => {
@@ -54,11 +56,20 @@ test('POST /', async () => {
 
 test('PATCH /:id', async () => {
   {
-    const response = await request(app).patch('/tasks/1').send({
-      id: 1,
-      title: 'title1-edit',
-      description: 'description1-edit',
-    })
+    const response = await request(app)
+      .patch('/tasks/1')
+      .send({
+        id: 1,
+        title: 'title1-edit',
+        description: 'description1-edit',
+        'subtasks[]': [],
+        'phases[0].title': 'phase1',
+        'phases[0].point': '10',
+        'phases[0].subtasks[]': ['1'],
+        'phases[1].title': 'phase2',
+        'phases[1].point': '20',
+        'phases[1].subtasks[]': ['2'],
+      })
     expect(response.statusCode).toBe(302)
     expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }

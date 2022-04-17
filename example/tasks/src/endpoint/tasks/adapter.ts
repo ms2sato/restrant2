@@ -1,5 +1,5 @@
 import { defineAdapter } from 'restrant2'
-import { Task } from './resource'
+import { Task } from '../../models/task-model'
 
 export default defineAdapter((_support, _routeConfig) => {
   return {
@@ -7,7 +7,7 @@ export default defineAdapter((_support, _routeConfig) => {
       success: (ctx, output: Task[]) => ctx.render('tasks/index', { tasks: output }),
     },
 
-    build: (ctx) => ctx.render('tasks/build', { task: {} }),
+    build: (ctx) => ctx.render('tasks/build', { task: { subtasks: [] } }),
 
     edit: {
       success: (ctx, output: Task) => ctx.render('tasks/edit', { task: output }),
