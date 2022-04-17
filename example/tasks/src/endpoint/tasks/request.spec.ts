@@ -59,7 +59,6 @@ test('PATCH /:id', async () => {
     const response = await request(app)
       .patch('/tasks/1')
       .send({
-        id: 1,
         title: 'title1-edit',
         description: 'description1-edit',
         'subtasks[]': [],
@@ -83,9 +82,7 @@ test('PATCH /:id', async () => {
 
 test('DELETE /:id', async () => {
   {
-    const response = await request(app).delete('/tasks/1').send({
-      id: 1,
-    })
+    const response = await request(app).delete('/tasks/1').send()
     expect(response.statusCode).toBe(302)
     expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }
@@ -104,7 +101,7 @@ test('POST /:id/done', async () => {
   }
 
   {
-    const response = await request(app).post('/tasks/2/done').send({})
+    const response = await request(app).post('/tasks/2/done').send()
     expect(response.statusCode).toBe(302)
     expect((response.headers as ResponseHeaders).location).toBe('/tasks')
   }

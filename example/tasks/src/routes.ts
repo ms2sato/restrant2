@@ -33,4 +33,13 @@ export function routes(router: Router) {
       { action: 'photoCache', path: '/photo_cache/:key', method: 'get' },
     ],
   })
+
+  router.resources('/api/tasks', {
+    construct: {
+      create: { schema: taskCreateSchema },
+      update: { schema: taskUpdateSchema },
+    },
+    name: 'api_task',
+    actions: [...Actions.api({ except: ['show'] })],
+  })
 }

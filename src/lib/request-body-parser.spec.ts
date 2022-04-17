@@ -52,6 +52,24 @@ describe('array node', () => {
     })
   })
 
+  test('array blanks to empty array', () => {
+    expect(parse({ 'user.hobbies[]': [] })).toEqual({
+      user: { hobbies: [] },
+    })
+  })
+
+  test('array blanks to undefined', () => {
+    expect(parse({ 'user.hobbies[]': undefined })).toEqual({
+      user: { hobbies: [] },
+    })
+  })
+
+  test('array blanks to empty string', () => {
+    expect(parse({ 'user.hobbies[]': '' })).toEqual({
+      user: { hobbies: [''] },
+    })
+  })
+
   test('array blank but one value', () => {
     expect(parse({ 'user.hobbies[]': 'guitar' })).toEqual({
       user: { hobbies: ['guitar'] },

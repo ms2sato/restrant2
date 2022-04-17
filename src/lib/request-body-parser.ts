@@ -50,7 +50,7 @@ export function nullTraverseArranger() {
   }
 }
 
-function arrangedResultOrRaw({arranged, result}: ArrangeResult, value: any) {
+function arrangedResultOrRaw({ arranged, result }: ArrangeResult, value: any) {
   return arranged ? result : value
 }
 
@@ -93,7 +93,10 @@ function createTraverser(arranger: TraverseArranger, key: string) {
 
         if (paths.length === pathIndex) {
           arranger.next(name, node, value, pathIndex)
-          node[name][index] = arrangedResultOrRaw(arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex), value)
+          node[name][index] = arrangedResultOrRaw(
+            arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex),
+            value
+          )
         } else {
           if (node[name][index] === undefined) {
             node[name][index] = {}
@@ -106,8 +109,7 @@ function createTraverser(arranger: TraverseArranger, key: string) {
 
         arranger.next(name, node, value, pathIndex)
         if (paths.length === pathIndex) {
-          const valueLength = value instanceof Array ? value.length : 0
-          const array = valueLength === 0 ? [value] : value
+          const array = value === undefined ? [] : value instanceof Array ? value : [value]
           node[name] = arrangedResultOrRaw(arranger.arrangeUnindexedArrayOnLast(name, node, array, pathIndex), array)
         } else {
           throw new Error('Unimplemented')

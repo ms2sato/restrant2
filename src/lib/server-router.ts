@@ -112,7 +112,7 @@ const createResourceMethodHandler = ({
     const ctx = new ActionContext(req, res)
     const options = await serverRouterConfig.createOptions(ctx, httpPath, actionDescriptor)
     const handleFatal = async (err: Error) => {
-      if ('fatal' in responder) {
+      if (responder && 'fatal' in responder) {
         try {
           handlerLog('%s#%s.fatal', adapterPath, actionName)
           await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
@@ -129,7 +129,7 @@ const createResourceMethodHandler = ({
 
     try {
       mergedBody = mergeSources(ctx, sources)
-      if ('beforeArrange' in responder) {
+      if (responder && 'beforeArrange' in responder) {
         mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
       }
       handlerLog('mergedBody: %o', mergedBody)
@@ -140,12 +140,12 @@ const createResourceMethodHandler = ({
     }
 
     try {
-      if ('beforeValidation' in responder) {
+      if (responder && 'beforeValidation' in responder) {
         source = await responder.beforeValidation!(ctx, source, schema, mergedBody)
       }
 
       let input = schema.parse(source)
-      if ('afterValidation' in responder) {
+      if (responder && 'afterValidation' in responder) {
         input = await responder.afterValidation!(ctx, input, schema, mergedBody)
       }
 
@@ -154,7 +154,7 @@ const createResourceMethodHandler = ({
       handlerLog('resourceMethod args: %o', args)
       const output = await resourceMethod.apply(resource, args)
 
-      if ('success' in responder) {
+      if (responder && 'success' in responder) {
         handlerLog('%s#%s.success', adapterPath, actionName)
         await responder.success.apply(adapter, [ctx, output, ...options])
       } else {
