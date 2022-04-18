@@ -21,7 +21,7 @@ import {
   ServerRouterConfig,
   ConstructSource,
   RequestCallback,
-  parse,
+  parseFormBody,
   createZodTraverseArrangerCreator,
   fillDefault,
 } from '../index'
@@ -78,7 +78,10 @@ export const smartInputArranger: InputArranger = (
   input: Record<string, any>,
   schema: z.ZodObject<any>
 ) => {
-  return parse(input, createZodTraverseArrangerCreator(schema))
+  if (ctx.req.headers['content-type'] && ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
+    return input
+  }
+  return parseFormBody(input, createZodTraverseArrangerCreator(schema))
 }
 
 type ResourceMethodHandlerParams = {

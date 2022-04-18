@@ -139,7 +139,7 @@ function createTraverser(arranger: TraverseArranger, key: string) {
   return traversePath
 }
 
-export function parse(body: Record<string, any>, arrangerCreator: TraverseArrangerCreator = nullTraverseArranger): any {
+export function parseFormBody(body: Record<string, any>, arrangerCreator: TraverseArrangerCreator = nullTraverseArranger): any {
   const ret: Record<string, any> = {}
   for (const [key, value] of Object.entries(body)) {
     createTraverser(arrangerCreator(), key)(key.split('.'), ret, value)

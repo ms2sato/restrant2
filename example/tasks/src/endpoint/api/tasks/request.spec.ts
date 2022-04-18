@@ -6,6 +6,9 @@ import { TaskModel } from '../../../models/task-model'
 let app: Application
 beforeAll(async () => {
   app = await setup()
+})
+
+beforeEach(() => {
   TaskModel.reset()
 })
 
@@ -66,18 +69,19 @@ test('POST /', async () => {
   }
 })
 
-test('PATCH /:id', async () => {
+test('PATCH /:id (Content-type: application/json)', async () => {
   {
-    const response = await request(app).patch('/api/tasks/1').send({
-      title: 'title1-edit',
-      description: 'description1-edit',
-      'phases[0].title': 'phase1',
-      'phases[0].point': '10',
-      'phases[0].subtasks[]': '1',
-      'phases[1].title': 'phase2',
-      'phases[1].point': '20',
-      'phases[1].subtasks[]': '2',
-    })
+    const response = await request(app)
+      .patch('/api/tasks/1')
+      .set('Content-Type', 'application/json')
+      .send({
+        title: 'title1-edit',
+        description: 'description1-edit',
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
+      })
     expect(response.statusCode).toBe(200)
     expect(response.body).toEqual({
       status: 'success',

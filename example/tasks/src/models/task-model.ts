@@ -52,7 +52,6 @@ export class TaskModel {
   }
 
   update(params: TaskUpdateParams) {
-    console.log('update', params)
     const { id, ...data } = params
     const task = { ...get(id), ...data }
     tasks.set(id, task)

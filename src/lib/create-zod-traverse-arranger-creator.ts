@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { TraverseArranger, TraverseArrangerCreator, ArrangeResult, nullArrangeResult } from './request-body-parser'
+import { TraverseArranger, TraverseArrangerCreator, ArrangeResult, nullArrangeResult } from './parse-form-body'
 
 export function createZodTraverseArrangerCreator(schema: z.AnyZodObject): TraverseArrangerCreator {
   return () => new ZodArranger(schema)
