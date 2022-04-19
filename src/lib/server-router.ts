@@ -24,6 +24,7 @@ import {
   parseFormBody,
   createZodTraverseArrangerCreator,
   fillDefault,
+  deepCast,
 } from '../index'
 
 const log = debug('restrant2')
@@ -64,25 +65,28 @@ function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): Cons
   }
 }
 
-const mergeSources = (ctx: ActionContext, sources: readonly string[]): Record<string, any> => {
-  let merged = {}
-  const record = ctx.req as Record<string, any>
-  for (const source of sources) {
-    merged = { ...merged, ...record[source] }
-  }
-  return merged
-}
-
 export const smartInputArranger: InputArranger = (
   ctx: ActionContext,
   sources: readonly string[],
-  schema: z.ZodObject<any>
+  schema: z.AnyZodObject
 ) => {
-  const input = mergeSources(ctx, sources)
+  const request = ctx.req as Record<string, any>
   if (ctx.req.headers['content-type'] && ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
-    return input
+    const mergedBody = sources.reduce((prev, source) => {
+      if (request[source] === undefined) {
+        return prev
+      }
+
+      const src = source === 'body' ? request[source] : deepCast(schema, request[source])
+      return { ...prev, ...src }
+    }, {})
+    return mergedBody
   }
-  return parseFormBody(input, createZodTraverseArrangerCreator(schema))
+
+  const mergedBody = sources.reduce((prev, source) => {
+    return { ...prev, ...request[source] }
+  }, {})
+  return parseFormBody(mergedBody, createZodTraverseArrangerCreator(schema))
 }
 
 type ResourceMethodHandlerParams = {
@@ -132,11 +136,6 @@ const createResourceMethodHandler = ({
     let source
 
     try {
-      // mergedBody = mergeSources(ctx, sources)
-      // if (responder && 'beforeArrange' in responder) {
-      //   mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
-      // }
-      // handlerLog('mergedBody: %o', mergedBody)
       source = serverRouterConfig.inputArranger(ctx, sources, schema)
       handlerLog('source: %o', source)
     } catch (err) {

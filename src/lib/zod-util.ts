@@ -21,23 +21,32 @@ export function stripDefault(schema: z.AnyZodObject) {
 }
 
 export function cast(schema: z.AnyZodObject, value: any): ArrangeResult {
-  if (schema instanceof z.ZodBigInt && typeof value !== 'bigint') {
-    return { arranged: true, result: BigInt(value) }
+  try {
+    if (schema instanceof z.ZodBigInt && typeof value !== 'bigint') {
+      return { arranged: true, result: BigInt(value) }
+    }
+    if (schema instanceof z.ZodNumber && typeof value !== 'number') {
+      const num = Number(value)
+      if (Number.isNaN(num)) {
+        return nullArrangeResult
+      }
+      return { arranged: true, result: num }
+    }
+    if (schema instanceof z.ZodBoolean && typeof value !== 'boolean') {
+      return { arranged: true, result: Boolean(value) }
+    }
+    if (schema instanceof z.ZodDate && !(value instanceof Date)) {
+      return { arranged: true, result: new Date(value) }
+    }
+    if (schema instanceof z.ZodString) {
+      if (value === '') return { arranged: true, result: null }
+      return { arranged: true, result: value.toString() }
+    }
+    return nullArrangeResult
+  } catch (err) {
+    console.warn(err)
+    return nullArrangeResult
   }
-  if (schema instanceof z.ZodNumber && typeof value !== 'number') {
-    return { arranged: true, result: Number(value) }
-  }
-  if (schema instanceof z.ZodBoolean && typeof value !== 'boolean') {
-    return { arranged: true, result: Boolean(value) }
-  }
-  if (schema instanceof z.ZodDate && !(value instanceof Date)) {
-    return { arranged: true, result: new Date(value) }
-  }
-  if (schema instanceof z.ZodString) {
-    if (value === '') return { arranged: true, result: null }
-    return { arranged: true, result: value.toString() }
-  }
-  return nullArrangeResult
 }
 
 type TraverseCallback = {
@@ -75,16 +84,6 @@ export function fillDefault(schema: z.AnyZodObject, obj: any): any {
   })
 }
 
-export function isBaseSchema(schema: z.AnyZodObject) {
-  return (
-    schema instanceof z.ZodString ||
-    schema instanceof z.ZodDate ||
-    schema instanceof z.ZodNumber ||
-    schema instanceof z.ZodBoolean ||
-    schema instanceof z.ZodBigInt
-  )
-}
-
 export function isValue(obj: any): boolean {
   return (
     typeof obj === 'string' ||
@@ -95,7 +94,7 @@ export function isValue(obj: any): boolean {
   )
 }
 
-function traverseObject(schema: z.AnyZodObject, obj: any) {
+export function deepCast(schema: z.AnyZodObject, obj: any) {
   if (isValue(obj)) {
     const ret = cast(stripDefault(schema), obj)
     return ret.arranged ? ret.result : obj
@@ -104,9 +103,9 @@ function traverseObject(schema: z.AnyZodObject, obj: any) {
   if (obj instanceof Array) {
     const arraySchema = stripDefault(schema)
     if (arraySchema instanceof z.ZodArray) {
-      const itemSchema = arraySchema.element
+      const itemSchema = stripDefault(arraySchema.element)
       obj.forEach((item, index) => {
-        obj[index] = traverseObject(itemSchema, item)
+        obj[index] = deepCast(itemSchema, item)
       })
     }
     return obj
@@ -115,12 +114,8 @@ function traverseObject(schema: z.AnyZodObject, obj: any) {
   for (const [key, val] of Object.entries<any>(obj)) {
     const itemSchema = stripDefault(schema).shape[key]
     if (itemSchema) {
-      obj[key] = traverseObject(itemSchema, val)
+      obj[key] = deepCast(itemSchema, val)
     }
   }
   return obj
-}
-
-export function deepCast(schema: z.AnyZodObject, obj: any): any {
-  return traverseObject(schema, obj)
 }

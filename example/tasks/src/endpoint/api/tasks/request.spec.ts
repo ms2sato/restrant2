@@ -47,7 +47,7 @@ test('GET /', async () => {
 
 test('POST /', async () => {
   {
-    const response = await request(app).post('/api/tasks/').send({
+    const response = await request(app).post('/api/tasks/').type('json').send({
       title: 'title1',
       description: 'description1',
     })
@@ -73,7 +73,7 @@ test('PATCH /:id (Content-type: application/json)', async () => {
   {
     const response = await request(app)
       .patch('/api/tasks/1')
-      .set('Content-Type', 'application/json')
+      .type('json')
       .send({
         title: 'title1-edit',
         description: 'description1-edit',

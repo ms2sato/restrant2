@@ -156,7 +156,6 @@ export type Responder<O> = {
 }
 
 export type RequestCallback = {
-  beforeArrange?: (ctx: ActionContext, mergedBody: any, schema: z.AnyZodObject) => any
   beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject, mergedBody: any) => any
   afterValidation?: (ctx: ActionContext, input: any, schema: z.AnyZodObject, mergedBody: any) => any
 }
@@ -189,7 +188,7 @@ export type ServerRouterConfig = {
 export type InputArranger = (
   ctx: ActionContext,
   sources: readonly string[],
-  schema: z.ZodObject<any>
+  schema: z.AnyZodObject
 ) => Record<string, any>
 
 export class ActionSupport {
