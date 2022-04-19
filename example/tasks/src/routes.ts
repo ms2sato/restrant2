@@ -40,6 +40,6 @@ export function routes(router: Router) {
       update: { schema: taskUpdateSchema },
     },
     name: 'api_task',
-    actions: [...Actions.api({ except: ['show'] })],
+    actions: Actions.api(),
   })
 }

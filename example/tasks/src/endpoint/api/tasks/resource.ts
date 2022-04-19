@@ -12,12 +12,12 @@ export default defineResource((_support, _routeConfig) => {
       return taskStore.all()
     },
 
-    create: (params: TaskCreateParams) => {
-      return taskStore.create(params)
+    show: ({ id }: IdNumberParams) => {
+      return taskStore.find(id)
     },
 
-    edit: ({ id }: IdNumberParams) => {
-      return taskStore.find(id)
+    create: (params: TaskCreateParams) => {
+      return taskStore.create(params)
     },
 
     update: (params: TaskUpdateParams) => {
