@@ -1,15 +1,9 @@
 import { z } from 'zod'
-import { TraverseArranger, TraverseArrangerCreator, ArrangeResult, nullArrangeResult } from './parse-form-body'
+import { stripDefault, cast, ArrangeResult, nullArrangeResult } from './zod-util'
+import { TraverseArranger, TraverseArrangerCreator } from './parse-form-body'
 
 export function createZodTraverseArrangerCreator(schema: z.AnyZodObject): TraverseArrangerCreator {
   return () => new ZodArranger(schema)
-}
-
-function stripDefault(schema: z.AnyZodObject) {
-  if (schema instanceof z.ZodDefault) {
-    return (schema._def as any).innerType
-  }
-  return schema
 }
 
 export class ZodArranger implements TraverseArranger {
@@ -26,7 +20,7 @@ export class ZodArranger implements TraverseArranger {
 
   arrangeIndexedArrayItemOnLast(name: string, node: Record<string, any>, value: any, pathIndex: number): ArrangeResult {
     if (this.isArraySchema()) {
-      return this.cast(this.elementSchema(), value)
+      return cast(this.elementSchema(), value)
     }
     return nullArrangeResult
   }
@@ -41,7 +35,7 @@ export class ZodArranger implements TraverseArranger {
   }
 
   arrangePropertyOnLast(path: string, node: Record<string, any>, value: any, pathIndex: number): ArrangeResult {
-    const result = this.cast(this.schema, value)
+    const result = cast(this.schema, value)
     if (result.arranged) {
       return result
     }
@@ -63,23 +57,9 @@ export class ZodArranger implements TraverseArranger {
     return {
       arranged: true,
       result: value.map((item: any) => {
-        const { result } = this.cast(elementSchema, item)
+        const { result } = cast(elementSchema, item)
         return result
       }),
     }
-  }
-
-  private cast(schema: z.AnyZodObject, value: any): ArrangeResult {
-    if (schema instanceof z.ZodNumber) {
-      return { arranged: true, result: Number(value) }
-    }
-    if (schema instanceof z.ZodDate) {
-      return { arranged: true, result: new Date(value) }
-    }
-    if (schema instanceof z.ZodString) {
-      if (value === '') return { arranged: true, result: null }
-      return { arranged: true, result: value.toString() }
-    }
-    return nullArrangeResult
   }
 }

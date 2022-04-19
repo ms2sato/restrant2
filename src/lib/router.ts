@@ -188,7 +188,7 @@ export type ServerRouterConfig = {
 
 export type InputArranger = (
   ctx: ActionContext,
-  input: Record<string, any>,
+  sources: readonly string[],
   schema: z.ZodObject<any>
 ) => Record<string, any>
 

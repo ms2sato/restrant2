@@ -1,16 +1,4 @@
-export type ArrangeResult =
-  | {
-      arranged: true
-      result: any
-    }
-  | {
-      arranged: false
-      result: undefined
-    }
-
-const nullArrangeResult = { arranged: false, result: undefined }
-
-export { nullArrangeResult }
+import { ArrangeResult, nullArrangeResult } from './zod-util'
 
 export type TraverseArranger = {
   next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void
@@ -139,7 +127,10 @@ function createTraverser(arranger: TraverseArranger, key: string) {
   return traversePath
 }
 
-export function parseFormBody(body: Record<string, any>, arrangerCreator: TraverseArrangerCreator = nullTraverseArranger): any {
+export function parseFormBody(
+  body: Record<string, any>,
+  arrangerCreator: TraverseArrangerCreator = nullTraverseArranger
+): any {
   const ret: Record<string, any> = {}
   for (const [key, value] of Object.entries(body)) {
     createTraverser(arrangerCreator(), key)(key.split('.'), ret, value)

@@ -75,9 +75,10 @@ const mergeSources = (ctx: ActionContext, sources: readonly string[]): Record<st
 
 export const smartInputArranger: InputArranger = (
   ctx: ActionContext,
-  input: Record<string, any>,
+  sources: readonly string[],
   schema: z.ZodObject<any>
 ) => {
+  const input = mergeSources(ctx, sources)
   if (ctx.req.headers['content-type'] && ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
     return input
   }
@@ -131,12 +132,12 @@ const createResourceMethodHandler = ({
     let source
 
     try {
-      mergedBody = mergeSources(ctx, sources)
-      if (responder && 'beforeArrange' in responder) {
-        mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
-      }
-      handlerLog('mergedBody: %o', mergedBody)
-      source = serverRouterConfig.inputArranger(ctx, mergedBody, schema)
+      // mergedBody = mergeSources(ctx, sources)
+      // if (responder && 'beforeArrange' in responder) {
+      //   mergedBody = await responder.beforeArrange!(ctx, mergedBody, schema)
+      // }
+      // handlerLog('mergedBody: %o', mergedBody)
+      source = serverRouterConfig.inputArranger(ctx, sources, schema)
       handlerLog('source: %o', source)
     } catch (err) {
       return handleFatal(err as Error)
@@ -170,7 +171,7 @@ const createResourceMethodHandler = ({
         handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
         if (responder) {
           if ('invalid' in responder) {
-            const filledSource = fillDefault(source, schema)
+            const filledSource = fillDefault(schema, source)
             handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
             res.status(422)
             await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
