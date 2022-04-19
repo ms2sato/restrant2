@@ -26,13 +26,13 @@ const get = (id: number): Task => {
   return task
 }
 
-// Sample user model. Can be implemented as you like
-export class TaskModel {
-  all() {
+// Sample task model. Can be implemented as you like
+export class TaskStore {
+  all(): Task[] {
     return Array.from(tasks, ([_id, data]) => data)
   }
 
-  create(params: TaskCreateParams) {
+  create(params: TaskCreateParams): Task {
     const task: Task = {
       ...params,
       id: ++lastId,
@@ -47,24 +47,24 @@ export class TaskModel {
     return task
   }
 
-  find(id: number) {
+  find(id: number): Task {
     return get(id)
   }
 
-  update(params: TaskUpdateParams) {
+  update(params: TaskUpdateParams): Task {
     const { id, ...data } = params
     const task = { ...get(id), ...data }
     tasks.set(id, task)
     return task
   }
 
-  destroy(id: number) {
+  destroy(id: number): Task {
     const task = get(id)
     tasks.delete(id)
     return task
   }
 
-  done(id: number) {
+  done(id: number): Task {
     const task = get(id)
     task.done = true
     return task

@@ -65,28 +65,39 @@ function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): Cons
   }
 }
 
+export function parseFormRequestBody(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+  const request = ctx.req as Record<string, any>
+  const mergedBody = sources.reduce((prev, source) => {
+    return { ...prev, ...request[source] }
+  }, {})
+  return parseFormBody(mergedBody, createZodTraverseArrangerCreator(schema))
+}
+
+export function parseJsonRequestBody(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+  const request = ctx.req as Record<string, any>
+
+  const mergedBody = sources.reduce((prev, source) => {
+    if (request[source] === undefined) {
+      return prev
+    }
+
+    const src = source === 'body' ? request[source] : deepCast(schema, request[source])
+    return { ...prev, ...src }
+  }, {})
+  return mergedBody
+}
+
 export const smartInputArranger: InputArranger = (
   ctx: ActionContext,
   sources: readonly string[],
   schema: z.AnyZodObject
 ) => {
-  const request = ctx.req as Record<string, any>
-  if (ctx.req.headers['content-type'] && ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
-    const mergedBody = sources.reduce((prev, source) => {
-      if (request[source] === undefined) {
-        return prev
-      }
-
-      const src = source === 'body' ? request[source] : deepCast(schema, request[source])
-      return { ...prev, ...src }
-    }, {})
-    return mergedBody
+  if (ctx.req.headers['content-type']) {
+    if (ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
+      return parseJsonRequestBody(ctx, sources, schema)
+    }
   }
-
-  const mergedBody = sources.reduce((prev, source) => {
-    return { ...prev, ...request[source] }
-  }, {})
-  return parseFormBody(mergedBody, createZodTraverseArrangerCreator(schema))
+  return parseFormRequestBody(ctx, sources, schema)
 }
 
 type ResourceMethodHandlerParams = {

@@ -1,31 +1,31 @@
-import { TaskModel } from '../../../models/task-model'
+import { TaskStore } from '../../../models/TaskStore'
 
 import { TaskCreateParams, TaskUpdateParams } from '../../../params'
 import { IdNumberParams, defineResource } from 'restrant2'
 
 export default defineResource((_support, _routeConfig) => {
-  TaskModel.reset()
-  const taskModel = new TaskModel()
+  TaskStore.reset()
+  const taskStore = new TaskStore()
 
   return {
     index: () => {
-      return taskModel.all()
+      return taskStore.all()
     },
 
     create: (params: TaskCreateParams) => {
-      return taskModel.create(params)
+      return taskStore.create(params)
     },
 
     edit: ({ id }: IdNumberParams) => {
-      return taskModel.find(id)
+      return taskStore.find(id)
     },
 
     update: (params: TaskUpdateParams) => {
-      return taskModel.update(params)
+      return taskStore.update(params)
     },
 
     destroy: ({ id }: IdNumberParams) => {
-      return taskModel.destroy(id)
+      return taskStore.destroy(id)
     },
   }
 })

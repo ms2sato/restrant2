@@ -1,7 +1,7 @@
 import { ResourceSupport, RouteConfig, defaultServerRouterConfig, ServerRouterConfig } from 'restrant2'
 import * as re from './resource'
 import { TaskCreateParams, TaskUpdateParams } from '../../params'
-import { TaskModel } from '../../models/task-model'
+import { TaskStore } from '../../models/TaskStore'
 
 type CallSetupParams = {
   rootPath: string
@@ -27,7 +27,7 @@ function callSetup(
 }
 
 beforeEach(() => {
-  TaskModel.reset()
+  TaskStore.reset()
 })
 
 test('index', () => {

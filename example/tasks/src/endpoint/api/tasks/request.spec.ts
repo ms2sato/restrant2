@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { Application } from 'express'
 import { setup } from '../../../web'
-import { TaskModel } from '../../../models/task-model'
+import { TaskStore } from '../../../models/TaskStore'
 
 let app: Application
 beforeAll(async () => {
@@ -9,7 +9,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  TaskModel.reset()
+  TaskStore.reset()
 })
 
 test('GET /', async () => {
