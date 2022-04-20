@@ -122,3 +122,33 @@ test('POST /:id/done', async () => {
     expect(response.text).toContain('closed')
   }
 })
+
+test('POST / invalid', async () => {
+  const response = await request(app).post('/tasks/').type('form').send({
+    title: '',
+    description: '',
+  })
+  expect(response.statusCode).toBe(422)
+  expect(response.text).toContain('Create Task')
+  expect(response.text).toContain('<form')
+})
+
+test('PATCH / invalid', async () => {
+  const response = await request(app).patch('/tasks/1').type('form').send({
+    title: '',
+    description: '',
+  })
+  expect(response.statusCode).toBe(422)
+  expect(response.text).toContain('Update Task')
+  expect(response.text).toContain('<form')
+})
+
+test('PUT / invalid', async () => {
+  const response = await request(app).put('/tasks/1').type('form').send({
+    title: '',
+    description: '',
+  })
+  expect(response.statusCode).toBe(422)
+  expect(response.text).toContain('Update Task')
+  expect(response.text).toContain('<form')
+})

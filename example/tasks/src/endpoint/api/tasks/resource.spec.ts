@@ -70,6 +70,7 @@ test('create', () => {
   const params: TaskCreateParams = {
     title: 'title1',
     description: 'description1',
+    subtasks: [],
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const output = resourceMethods.create(params)

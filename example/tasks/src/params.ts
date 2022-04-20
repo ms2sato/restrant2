@@ -10,6 +10,7 @@ export type AdminWithIdNumberParams = z.infer<typeof adminWithIdNumberSchema>
 const taskCoreProps = {
   title: z.string().min(3).max(255),
   description: z.string().min(3).max(4096),
+  subtasks: z.array(z.number()).default([]),
 }
 
 export const taskCreateSchema = z.object(taskCoreProps)
@@ -26,7 +27,6 @@ export const taskUpdateSchema = z.object({
   id: z.number(),
   ...taskCoreProps,
   done: z.boolean().optional(),
-  subtasks: z.array(z.number()).default([]),
   phases: z.array(phaseSchema),
 })
 
