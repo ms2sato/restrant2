@@ -86,7 +86,7 @@ test('PATCH /:id', async () => {
 
   {
     const response = await request(app).get('/tasks/1/edit')
-    expect(response.text).toContain('<input type="checkbox" name="phases[0].subtasks[]" value="1" checked="checked"/>')
+    expect(response.text).toContain('<input type="checkbox" name="phases[0].subtasks[]" value="1" checked>')
   }
 })
 

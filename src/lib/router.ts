@@ -182,14 +182,14 @@ export type Adapter<O> = {
 
 export class RouterError extends Error {}
 
-export type CreateOptionsFunction = {
+export type CreateActionOptionsFunction = {
   (ctx: ActionContext, httpPath: string, ad: ActionDescriptor): Promise<any[]>
 }
 
 export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  createOptions: CreateOptionsFunction
+  createActionOptions: CreateActionOptionsFunction
   constructConfig: ConstructConfig
   adapterRoot: string
   adapterFileName: string

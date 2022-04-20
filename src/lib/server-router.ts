@@ -9,10 +9,9 @@ import {
   ActionSupport,
   ConstructConfig,
   ConstructDescriptor,
-  CreateOptionsFunction,
+  CreateActionOptionsFunction,
   Handler,
   MultiOptionAdapter,
-  InputArranger,
   MultiOptionResponder,
   ResourceSupport,
   RouteConfig,
@@ -133,7 +132,7 @@ const createResourceMethodHandler = ({
 
   return async (req, res, next) => {
     const ctx = new ActionContext(req, res)
-    const options = await serverRouterConfig.createOptions(ctx, httpPath, actionDescriptor)
+    const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
     const handleFatal = async (err: Error) => {
       if (responder && 'fatal' in responder) {
         try {
@@ -208,7 +207,7 @@ const createResourceMethodHandler = ({
   }
 }
 
-const createNullOptions: CreateOptionsFunction = async (ctx, httpPath, ad) => {
+const createNullActionOptions: CreateActionOptionsFunction = async (ctx, httpPath, ad) => {
   return []
 }
 
@@ -251,7 +250,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
   return {
     actions: Actions.standard(),
     inputArranger: createSmartInputArranger(),
-    createOptions: createNullOptions,
+    createActionOptions: createNullActionOptions,
     constructConfig: defaultConstructConfig(),
     adapterRoot: './endpoint',
     adapterFileName: 'adapter',

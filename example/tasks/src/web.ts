@@ -7,7 +7,7 @@ import os from 'os'
 import fileUpload from 'express-fileupload'
 import { ServerRouter } from 'restrant2'
 import { routes } from './routes'
-import { createOptions } from './endpoint_options'
+import { createActionOptions } from './endpoint_options'
 
 process.on('uncaughtException', (err) => {
   console.error(err)
@@ -72,7 +72,7 @@ export async function setup() {
   })
 
   const router: ServerRouter = new ServerRouter(__dirname, {
-    createOptions,
+    createActionOptions: createActionOptions,
   })
   app.use(router.router)
   routes(router)
