@@ -87,17 +87,30 @@ export function parseJsonRequestBody(ctx: ActionContext, sources: readonly strin
   return mergedBody
 }
 
+type BodyParser = {
+  (ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject): any
+}
+
+const contentType2Parser: Record<string, BodyParser> = {
+  'application/json': parseJsonRequestBody,
+  'application/x-www-form-urlencoded': parseFormRequestBody,
+  'multipart/form-data': parseFormRequestBody,
+}
+
 export const smartInputArranger: InputArranger = (
   ctx: ActionContext,
   sources: readonly string[],
   schema: z.AnyZodObject
 ) => {
-  if (ctx.req.headers['content-type']) {
-    if (ctx.req.headers['content-type'].indexOf('application/json') >= 0) {
-      return parseJsonRequestBody(ctx, sources, schema)
+  const requestedContentType = ctx.req.headers['content-type']
+  if (requestedContentType) {
+    for (const [contentType, parser] of Object.entries<BodyParser>(contentType2Parser)) {
+      if (requestedContentType.indexOf(contentType) >= 0) {
+        return parser(ctx, sources, schema)
+      }
     }
   }
-  return parseFormRequestBody(ctx, sources, schema)
+  return parseFormRequestBody(ctx, sources, schema) // TODO: pluggable
 }
 
 type ResourceMethodHandlerParams = {
