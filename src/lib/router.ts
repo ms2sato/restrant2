@@ -139,6 +139,17 @@ export class ActionContext {
   get query() {
     return this.req.query
   }
+
+  mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
+    const request = this.req as Record<string, any>
+    return sources.reduce((prev, source) => {
+      if (request[source] === undefined) {
+        return prev
+      }
+
+      return { ...prev, ...pred(request[source], source) }
+    }, {})
+  }
 }
 
 export type Handler = (ctx: ActionContext) => void | Promise<void>

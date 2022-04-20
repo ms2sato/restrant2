@@ -65,52 +65,43 @@ function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): Cons
   }
 }
 
-export function parseFormRequestBody(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
-  const request = ctx.req as Record<string, any>
-  const mergedBody = sources.reduce((prev, source) => {
-    return { ...prev, ...request[source] }
-  }, {})
-  return parseFormBody(mergedBody, createZodTraverseArrangerCreator(schema))
+export function arrangeFormInput(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+  return parseFormBody(ctx.mergeInputs(sources), createZodTraverseArrangerCreator(schema))
 }
 
-export function parseJsonRequestBody(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
-  const request = ctx.req as Record<string, any>
-
-  const mergedBody = sources.reduce((prev, source) => {
-    if (request[source] === undefined) {
-      return prev
-    }
-
-    const src = source === 'body' ? request[source] : deepCast(schema, request[source])
-    return { ...prev, ...src }
-  }, {})
-  return mergedBody
+export function arrangeJsonInput(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+  const pred = (input: any, source: string) => {
+    return source === 'body' ? input : deepCast(schema, input)
+  }
+  return ctx.mergeInputs(sources, pred)
 }
 
-type BodyParser = {
+export type ContentArranger = {
   (ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject): any
 }
 
-const contentType2Parser: Record<string, BodyParser> = {
-  'application/json': parseJsonRequestBody,
-  'application/x-www-form-urlencoded': parseFormRequestBody,
-  'multipart/form-data': parseFormRequestBody,
+type ContentType2Arranger = Record<string, ContentArranger>
+
+export const defaultContentType2Arranger: ContentType2Arranger = {
+  'application/json': arrangeJsonInput,
+  'application/x-www-form-urlencoded': arrangeFormInput,
+  'multipart/form-data': arrangeFormInput,
+  '': arrangeFormInput,
 }
 
-export const smartInputArranger: InputArranger = (
-  ctx: ActionContext,
-  sources: readonly string[],
-  schema: z.AnyZodObject
-) => {
-  const requestedContentType = ctx.req.headers['content-type']
-  if (requestedContentType) {
-    for (const [contentType, parser] of Object.entries<BodyParser>(contentType2Parser)) {
-      if (requestedContentType.indexOf(contentType) >= 0) {
-        return parser(ctx, sources, schema)
+export const createSmartInputArranger = (contentType2Arranger: ContentType2Arranger = defaultContentType2Arranger) => {
+  return (ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) => {
+    const requestedContentType = ctx.req.headers['content-type']
+    if (requestedContentType) {
+      for (const [contentType, parser] of Object.entries<ContentArranger>(contentType2Arranger)) {
+        if (contentType === '') continue
+        if (requestedContentType.indexOf(contentType) >= 0) {
+          return parser(ctx, sources, schema)
+        }
       }
     }
+    return contentType2Arranger[''](ctx, sources, schema) // TODO: overwritable
   }
-  return parseFormRequestBody(ctx, sources, schema) // TODO: pluggable
 }
 
 type ResourceMethodHandlerParams = {
@@ -259,7 +250,7 @@ export const importAndSetup = async (
 export function defaultServerRouterConfig(): ServerRouterConfig {
   return {
     actions: Actions.standard(),
-    inputArranger: smartInputArranger,
+    inputArranger: createSmartInputArranger(),
     createOptions: createNullOptions,
     constructConfig: defaultConstructConfig(),
     adapterRoot: './endpoint',
