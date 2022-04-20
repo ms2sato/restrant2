@@ -455,13 +455,20 @@ export class ServerRouter extends BasicRouter {
 
         routeLog(
           '%s %s\t%s\t{actionOverride:%s, resourceMethod:%s}',
-          actionDescriptor.method,
+          actionDescriptor.method instanceof Array ? actionDescriptor.method.join(',') : actionDescriptor.method,
           path.join(this.httpPath, urlPath),
           actionName,
           actionOverride,
           !!resourceMethod
         )
-        ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
+
+        if (actionDescriptor.method instanceof Array) {
+          for (const method of actionDescriptor.method) {
+            ;(this.router as any)[method].apply(this.router, [urlPath, ...params])
+          }
+        } else {
+          ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
+        }
       }
     }
   }

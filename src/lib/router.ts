@@ -5,11 +5,12 @@ export { z }
 
 export type ConstructSource = 'body' | 'query' | 'params' | 'files'
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
+export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'option'
 
 export type ActionDescriptor = {
   action: string
   path: string
-  method: 'get' | 'post' | 'put' | 'patch' | 'delete'
+  method: HttpMethod | readonly HttpMethod[]
 }
 
 export type ConstructDescriptor = {
@@ -61,7 +62,7 @@ export namespace Actions {
   const update: ActionDescriptor = {
     action: 'update',
     path: '/:id',
-    method: 'patch',
+    method: [ 'put', 'patch' ],
   } as const
   const destroy: ActionDescriptor = {
     action: 'destroy',
