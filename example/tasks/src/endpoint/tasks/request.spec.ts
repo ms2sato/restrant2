@@ -21,27 +21,27 @@ test('GET /', async () => {
   const response = await request(app).get('/tasks')
 
   expect(response.statusCode).toBe(200)
-  expect((response.headers as ResponseHeaders)['content-type']).toContain('text/html')
-  expect(response.text).toContain('test1')
-  expect(response.text).toContain('test2')
+  expect((response.headers as ResponseHeaders)['content-type']).toMatch('text/html')
+  expect(response.text).toMatch('test1')
+  expect(response.text).toMatch('test2')
 })
 
 test('GET /build', async () => {
   const response = await request(app).get('/tasks/build')
 
   expect(response.statusCode).toBe(200)
-  expect((response.headers as ResponseHeaders)['content-type']).toContain('text/html')
-  expect(response.text).toContain('Create Task')
-  expect(response.text).toContain('<form')
+  expect((response.headers as ResponseHeaders)['content-type']).toMatch('text/html')
+  expect(response.text).toMatch('Create Task')
+  expect(response.text).toMatch('<form')
 })
 
 test('GET /:id/edit', async () => {
   const response = await request(app).get('/tasks/1/edit')
 
   expect(response.statusCode).toBe(200)
-  expect((response.headers as ResponseHeaders)['content-type']).toContain('text/html')
-  expect(response.text).toContain('Update Task')
-  expect(response.text).toContain('<form')
+  expect((response.headers as ResponseHeaders)['content-type']).toMatch('text/html')
+  expect(response.text).toMatch('Update Task')
+  expect(response.text).toMatch('<form')
 })
 
 test('POST /', async () => {
@@ -56,8 +56,8 @@ test('POST /', async () => {
 
   {
     const response = await request(app).get('/tasks')
-    expect(response.text).toContain('title1')
-    expect(response.text).toContain('description1')
+    expect(response.text).toMatch('title1')
+    expect(response.text).toMatch('description1')
   }
 })
 
@@ -80,13 +80,13 @@ test('PATCH /:id', async () => {
 
   {
     const response = await request(app).get('/tasks')
-    expect(response.text).toContain('title1')
-    expect(response.text).toContain('description1')
+    expect(response.text).toMatch('title1')
+    expect(response.text).toMatch('description1')
   }
 
   {
     const response = await request(app).get('/tasks/1/edit')
-    expect(response.text).toContain('<input type="checkbox" name="phases[0].subtasks[]" value="1" checked>')
+    expect(response.text).toMatch('<input type="checkbox" name="phases[0].subtasks[]" value="1" checked>')
   }
 })
 
@@ -99,7 +99,7 @@ test('DELETE /:id', async () => {
 
   {
     const response = await request(app).get('/tasks')
-    expect(response.text).not.toContain('test1')
+    expect(response.text).not.toMatch('test1')
   }
 })
 
@@ -107,7 +107,7 @@ test('POST /:id/done', async () => {
   {
     // before: Not have closed tasks
     const response = await request(app).get('/tasks')
-    expect(response.text).not.toContain('closed')
+    expect(response.text).not.toMatch('closed')
   }
 
   {
@@ -119,7 +119,7 @@ test('POST /:id/done', async () => {
   {
     // after: have closed task
     const response = await request(app).get('/tasks')
-    expect(response.text).toContain('closed')
+    expect(response.text).toMatch('closed')
   }
 })
 
@@ -129,8 +129,8 @@ test('POST / invalid', async () => {
     description: '',
   })
   expect(response.statusCode).toBe(422)
-  expect(response.text).toContain('Create Task')
-  expect(response.text).toContain('<form')
+  expect(response.text).toMatch('Create Task')
+  expect(response.text).toMatch('<form')
 })
 
 test('PATCH / invalid', async () => {
@@ -139,8 +139,8 @@ test('PATCH / invalid', async () => {
     description: '',
   })
   expect(response.statusCode).toBe(422)
-  expect(response.text).toContain('Update Task')
-  expect(response.text).toContain('<form')
+  expect(response.text).toMatch('Update Task')
+  expect(response.text).toMatch('<form')
 })
 
 test('PUT / invalid', async () => {
@@ -149,6 +149,6 @@ test('PUT / invalid', async () => {
     description: '',
   })
   expect(response.statusCode).toBe(422)
-  expect(response.text).toContain('Update Task')
-  expect(response.text).toContain('<form')
+  expect(response.text).toMatch('Update Task')
+  expect(response.text).toMatch('<form')
 })
