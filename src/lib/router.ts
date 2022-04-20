@@ -62,7 +62,7 @@ export namespace Actions {
   const update: ActionDescriptor = {
     action: 'update',
     path: '/:id',
-    method: [ 'put', 'patch' ],
+    method: ['put', 'patch'],
   } as const
   const destroy: ActionDescriptor = {
     action: 'destroy',
@@ -156,28 +156,28 @@ export class ActionContext {
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
-  success: (ctx: ActionContext, output: any, ...options: any) => unknown | Promise<unknown>
+  success?: (ctx: ActionContext, output: any, ...options: any) => unknown | Promise<unknown>
   invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => void | Promise<void>
   fatal?: (ctx: ActionContext, err: Error, ...options: any) => void | Promise<void>
 }
 
-export type Responder<O> = {
-  success: (ctx: ActionContext, output: any, option: O) => unknown | Promise<unknown>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: any, option: O) => void | Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, option: O) => void | Promise<void>
+export type Responder<Opt = undefined, Out = any, Src = any> = {
+  success?: (ctx: ActionContext, output: Out, option: Opt) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option: Opt) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, option: Opt) => void | Promise<void>
 }
 
-export type RequestCallback = {
-  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject, mergedBody: any) => any
-  afterValidation?: (ctx: ActionContext, input: any, schema: z.AnyZodObject, mergedBody: any) => any
+export type RequestCallback<In = any> = {
+  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject) => any
+  afterValidation?: (ctx: ActionContext, input: In, schema: z.AnyZodObject) => any
 }
 
 export type MultiOptionAdapter = {
   [key: string]: Handler | MultiOptionResponder | RequestCallback
 }
 
-export type Adapter<O> = {
-  [key: string]: Handler | Responder<O> | RequestCallback
+export type Adapter<Opt = undefined, In = any> = {
+  [key: string]: Handler | Responder<Opt> | RequestCallback<In>
 }
 
 export class RouterError extends Error {}
@@ -211,7 +211,9 @@ export class ResourceSupport {
   constructor(readonly rootPath: string, readonly serverRouterConfig: ServerRouterConfig) {}
 }
 
-export function defineResource(callback: (support: ResourceSupport, config: RouteConfig) => Record<string, Function>) {
+export function defineResource<R extends Record<string, Function>>(
+  callback: (support: ResourceSupport, config: RouteConfig) => R
+) {
   return callback
 }
 
@@ -221,6 +223,19 @@ export function defineMultiOptionAdapter(
   return callback
 }
 
-export function defineAdapter<O = undefined>(callback: (support: ActionSupport, config: RouteConfig) => Adapter<O>) {
+export function defineAdapter<O = undefined, AR = Adapter<O>>(
+  callback: (support: ActionSupport, config: RouteConfig) => AR
+) {
   return callback
+}
+
+type ResourceFunc = (support: ResourceSupport, config: RouteConfig) => Record<string, (...args: any) => any>
+
+export type AdapterOf<R extends ResourceFunc, Opt = undefined> = {
+  [key in keyof ReturnType<R>]: Responder<
+    Opt,
+    Awaited<ReturnType<ReturnType<R>[key]>>,
+    Partial<Parameters<ReturnType<R>[key]>[0]>
+  > &
+    RequestCallback<Parameters<ReturnType<R>[key]>[0]>
 }

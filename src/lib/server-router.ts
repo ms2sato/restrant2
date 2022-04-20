@@ -146,7 +146,6 @@ const createResourceMethodHandler = ({
       }
     }
 
-    let mergedBody
     let source
 
     try {
@@ -158,12 +157,12 @@ const createResourceMethodHandler = ({
 
     try {
       if (responder && 'beforeValidation' in responder) {
-        source = await responder.beforeValidation!(ctx, source, schema, mergedBody)
+        source = await responder.beforeValidation!(ctx, source, schema)
       }
 
       let input = schema.parse(source)
       if (responder && 'afterValidation' in responder) {
-        input = await responder.afterValidation!(ctx, input, schema, mergedBody)
+        input = await responder.afterValidation!(ctx, input, schema)
       }
 
       routeLog('input', input)
@@ -173,7 +172,7 @@ const createResourceMethodHandler = ({
 
       if (responder && 'success' in responder) {
         handlerLog('%s#%s.success', adapterPath, actionName)
-        await responder.success.apply(adapter, [ctx, output, ...options])
+        await responder.success!.apply(adapter, [ctx, output, ...options])
       } else {
         handlerLog('%s#%s success as json', adapterPath, actionName)
         res.json({ status: 'success', data: output })
