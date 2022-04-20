@@ -1,3 +1,6 @@
-h1 Create User 
-include _form
-+form(`/admins/${data.adminId}/users`, 'post')
+extend ../layout
+
+block content
+  h1 Create User 
+  include _form
+  +form(`/admins/${data.adminId}/users`, 'post')

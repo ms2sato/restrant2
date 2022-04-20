@@ -1,3 +1,6 @@
-h1 Update Task 
-include _form
-+form(`/tasks/${task.id}`, 'patch', true)
+extend ../layout
+
+block content
+  h1 Update Task 
+  include _form
+  +form(`/tasks/${task.id}`, 'patch', true)

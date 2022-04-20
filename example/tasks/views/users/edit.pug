@@ -1,5 +1,8 @@
-h1 Update User 
-include _form
-+form(`/admins/${data.adminId}/users/${data.id}`, 'patch')
-hr
-div= languages          
+extend ../layout
+
+block content
+  h1 Update User 
+  include _form
+  +form(`/admins/${data.adminId}/users/${data.id}`, 'patch')
+  hr
+  div= languages          

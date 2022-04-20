@@ -1,25 +1,28 @@
-h1 User list 
-a(href=`/admins/${admin.id}/users/build`) create new user
-table(border="1")
-  thead 
-    tr
-      th id
-      th name
-      th photo
-      th actions
-  tbody 
-    each user in users 
-      tr 
-        td=user.id
-        td=user.name
-        td
-          if user.photo
-            img(src=`/admins/${admin.id}/users/${user.id}/photo`, width="120")
-          else 
-            div Photo not found
-        td 
-          a(href=`/admins/${admin.id}/users/${user.id}/edit`) edit
-          |&nbsp;|&nbsp;
-          a(href=`/admins/${admin.id}/users/${user.id}?_method=delete`) delete
-hr
-div= languages          
+extend ../layout
+
+block content
+  h1 User list 
+  a(href=`/admins/${admin.id}/users/build`) create new user
+  table(border="1")
+    thead 
+      tr
+        th id
+        th name
+        th photo
+        th actions
+    tbody 
+      each user in users 
+        tr 
+          td=user.id
+          td=user.name
+          td
+            if user.photo
+              img(src=`/admins/${admin.id}/users/${user.id}/photo`, width="120")
+            else 
+              div Photo not found
+          td 
+            a(href=`/admins/${admin.id}/users/${user.id}/edit`) edit
+            |&nbsp;|&nbsp;
+            a(href=`/admins/${admin.id}/users/${user.id}?_method=delete`) delete
+  hr
+  div= languages          
