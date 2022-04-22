@@ -6,7 +6,7 @@ import type resource from './resource'
 
 type Adapter = AdapterOf<typeof resource, AcceptLanguageOption> & { build: Handler; photoCache: Handler }
 
-export default defineAdapter<AcceptLanguageOption>((_support, _routeConfig): Adapter => {
+export default defineAdapter<Adapter>((_support, _routeConfig): Adapter => {
   return {
     index: {
       success: (ctx, output, option) => {

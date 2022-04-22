@@ -223,7 +223,7 @@ export function defineMultiOptionAdapter(
   return callback
 }
 
-export function defineAdapter<O = undefined, AR = Adapter<O>>(
+export function defineAdapter<AR>(
   callback: (support: ActionSupport, config: RouteConfig) => AR
 ) {
   return callback
