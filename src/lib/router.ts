@@ -223,19 +223,14 @@ export function defineMultiOptionAdapter(
   return callback
 }
 
-export function defineAdapter<AR>(
-  callback: (support: ActionSupport, config: RouteConfig) => AR
-) {
+export function defineAdapter<AR>(callback: (support: ActionSupport, config: RouteConfig) => AR) {
   return callback
 }
 
 type ResourceFunc = (support: ResourceSupport, config: RouteConfig) => Record<string, (...args: any) => any>
 
 export type AdapterOf<R extends ResourceFunc, Opt = undefined> = {
-  [key in keyof ReturnType<R>]: Responder<
-    Opt,
-    Awaited<ReturnType<ReturnType<R>[key]>>,
-    Partial<Parameters<ReturnType<R>[key]>[0]>
-  > &
-    RequestCallback<Parameters<ReturnType<R>[key]>[0]>
+  [key in keyof ReturnType<R>]:
+    | Responder<Opt, Awaited<ReturnType<ReturnType<R>[key]>>, Partial<Parameters<ReturnType<R>[key]>[0]>>
+    | RequestCallback<Parameters<ReturnType<R>[key]>[0]>
 }
