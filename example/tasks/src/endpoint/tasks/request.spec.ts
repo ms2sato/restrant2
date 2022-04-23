@@ -152,3 +152,37 @@ test('PUT / invalid', async () => {
   expect(response.text).toMatch('Update Task')
   expect(response.text).toMatch('<form')
 })
+
+test('GET /index.json (specify format)', async () => {
+  const response = await request(app).get('/tasks.json')
+
+  expect(response.statusCode).toBe(200)
+  expect((response.headers as ResponseHeaders)['content-type']).toMatch('application/json')
+  expect(response.body).toEqual({
+    status: 'success',
+    data: [
+      {
+        id: 1,
+        title: 'test1',
+        description: 'test',
+        done: false,
+        subtasks: [1],
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
+      },
+      {
+        id: 2,
+        title: 'test2',
+        description: 'test',
+        done: false,
+        subtasks: [],
+        phases: [
+          { title: 'phase1', point: 10, subtasks: [1] },
+          { title: 'phase2', point: 20, subtasks: [2] },
+        ],
+      },
+    ],
+  })
+})

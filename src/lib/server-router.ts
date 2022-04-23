@@ -4,6 +4,7 @@ import { z } from 'zod'
 import debug from 'debug'
 import {
   ActionContext,
+  ActionContextImpl,
   ActionDescriptor,
   Actions,
   ActionSupport,
@@ -25,6 +26,7 @@ import {
   fillDefault,
   deepCast,
 } from '../index'
+import { MutableActionContext } from './router'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -64,11 +66,11 @@ function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): Cons
   }
 }
 
-export function arrangeFormInput(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+export function arrangeFormInput(ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) {
   return parseFormBody(ctx.mergeInputs(sources), createZodTraverseArrangerCreator(schema))
 }
 
-export function arrangeJsonInput(ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) {
+export function arrangeJsonInput(ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) {
   const pred = (input: any, source: string) => {
     return source === 'body' ? input : deepCast(schema, input)
   }
@@ -76,7 +78,7 @@ export function arrangeJsonInput(ctx: ActionContext, sources: readonly string[],
 }
 
 export type ContentArranger = {
-  (ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject): any
+  (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject): any
 }
 
 type ContentType2Arranger = Record<string, ContentArranger>
@@ -89,7 +91,7 @@ export const defaultContentType2Arranger: ContentType2Arranger = {
 }
 
 export const createSmartInputArranger = (contentType2Arranger: ContentType2Arranger = defaultContentType2Arranger) => {
-  return (ctx: ActionContext, sources: readonly string[], schema: z.AnyZodObject) => {
+  return (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) => {
     const requestedContentType = ctx.req.headers['content-type']
     if (requestedContentType) {
       for (const [contentType, parser] of Object.entries<ContentArranger>(contentType2Arranger)) {
@@ -131,7 +133,7 @@ const createResourceMethodHandler = ({
   const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
-    const ctx = new ActionContext(req, res)
+    const ctx = new ActionContextImpl(req, res)
     const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
     const handleFatal = async (err: Error) => {
       if (responder && 'fatal' in responder) {
@@ -408,7 +410,7 @@ export class ServerRouter extends BasicRouter {
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
-            const ctx = new ActionContext(req, res)
+            const ctx = new ActionContextImpl(req, res)
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
               await actionFunc(ctx)
@@ -460,12 +462,13 @@ export class ServerRouter extends BasicRouter {
           !!resourceMethod
         )
 
+        const urlPathWithExt = `${urlPath.replace(/\/$/, '')}.:format?`
         if (actionDescriptor.method instanceof Array) {
           for (const method of actionDescriptor.method) {
-            ;(this.router as any)[method].apply(this.router, [urlPath, ...params])
+            ;(this.router as any)[method].apply(this.router, [urlPathWithExt, ...params])
           }
         } else {
-          ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPath, ...params])
+          ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPathWithExt, ...params])
         }
       }
     }

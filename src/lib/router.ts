@@ -121,7 +121,22 @@ export namespace Actions {
 
 export type ValidationError = z.ZodError
 
-export class ActionContext {
+export type ActionContext = {
+  readonly render: express.Response['render']
+  readonly redirect: express.Response['redirect']
+  readonly params: express.Request['params']
+  readonly body: express.Request['body']
+  readonly query: express.Request['query']
+  readonly format: string
+  readonly req: express.Request
+  readonly res: express.Response
+}
+
+export type MutableActionContext = ActionContext & {
+  mergeInputs(sources: readonly string[], pred?: (input: any, source: string) => any): any
+}
+
+export class ActionContextImpl implements MutableActionContext {
   readonly render
   readonly redirect
 
@@ -139,6 +154,10 @@ export class ActionContext {
   }
   get query() {
     return this.req.query
+  }
+
+  get format() {
+    return this.req.params.format
   }
 
   mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
@@ -198,7 +217,7 @@ export type ServerRouterConfig = {
 }
 
 export type InputArranger = (
-  ctx: ActionContext,
+  ctx: MutableActionContext,
   sources: readonly string[],
   schema: z.AnyZodObject
 ) => Record<string, any>

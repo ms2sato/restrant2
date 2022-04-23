@@ -6,7 +6,13 @@ type Adapter = AdapterOf<typeof resource> & { build: Handler }
 export default defineAdapter((_support, _routeConfig): Adapter => {
   return {
     index: {
-      success: (ctx, output) => ctx.render('tasks/index', { tasks: output }),
+      success: (ctx, output) => {
+        if (ctx.format === 'json') {
+          ctx.res.json({ data: output, status: 'success' })
+        } else {
+          ctx.render('tasks/index', { tasks: output })
+        }
+      },
     },
 
     build: (ctx) => ctx.render('tasks/build', { task: { subtasks: [] } }),
