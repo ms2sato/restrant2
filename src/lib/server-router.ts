@@ -25,6 +25,8 @@ import {
   createZodTraverseArrangerCreator,
   fillDefault,
   deepCast,
+  ValidationError,
+  Responder,
 } from '../index'
 import { MutableActionContext } from './router'
 
@@ -94,10 +96,10 @@ export const createSmartInputArranger = (contentType2Arranger: ContentType2Arran
   return (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) => {
     const requestedContentType = ctx.req.headers['content-type']
     if (requestedContentType) {
-      for (const [contentType, parser] of Object.entries<ContentArranger>(contentType2Arranger)) {
+      for (const [contentType, contentArranger] of Object.entries<ContentArranger>(contentType2Arranger)) {
         if (contentType === '') continue
         if (requestedContentType.indexOf(contentType) >= 0) {
-          return parser(ctx, sources, schema)
+          return contentArranger(ctx, sources, schema)
         }
       }
     }
@@ -118,6 +120,35 @@ type ResourceMethodHandlerParams = {
   adapter: MultiOptionAdapter
 }
 
+// FIXME: @see https://google.github.io/styleguide/jsoncstyleguide.xml
+class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
+  success(ctx: ActionContext, output: Out): void | Promise<void> {
+    ctx.res.json({ status: 'success', data: output })
+  }
+
+  invalid(ctx: ActionContext, validationError: ValidationError, source: Src): void | Promise<void> {
+    ctx.res.status(422)
+    ctx.res.json({
+      status: 'error',
+      errors: validationError.errors,
+      message: validationError.message,
+    })
+  }
+
+  fatal(ctx: ActionContext, err: Error): void | Promise<void> {
+    // FIXME: dispatch Error class
+    ctx.res.status(500)
+
+    if (process.env.NODE_ENV === 'production') {
+      ctx.res.json({
+        status: 'fatal',
+      })
+    } else {
+      throw err
+    }
+  }
+}
+
 const createResourceMethodHandler = ({
   resourceMethod,
   resource,
@@ -130,6 +161,7 @@ const createResourceMethodHandler = ({
   responder,
   adapter,
 }: ResourceMethodHandlerParams): express.Handler => {
+  const defaultResponder = serverRouterConfig.defaultResponder
   const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
@@ -141,7 +173,7 @@ const createResourceMethodHandler = ({
           handlerLog('%s#%s.fatal', adapterPath, actionName)
           await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
         } catch (er) {
-          next(er)
+          defaultResponder.fatal(ctx, err)
         }
       } else {
         return next(err)
@@ -176,8 +208,8 @@ const createResourceMethodHandler = ({
         handlerLog('%s#%s.success', adapterPath, actionName)
         await responder.success!.apply(adapter, [ctx, output, ...options])
       } else {
-        handlerLog('%s#%s success as json', adapterPath, actionName)
-        res.json({ status: 'success', data: output })
+        handlerLog('%s#%s success by default responder', adapterPath, actionName)
+        defaultResponder.success(ctx, output)
       }
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -193,13 +225,8 @@ const createResourceMethodHandler = ({
             next(validationError)
           }
         } else {
-          handlerLog('%s#%s invalid as json', adapterPath, actionName)
-          res.status(422)
-          res.json({
-            status: 'error',
-            errors: validationError.errors,
-            message: validationError.message,
-          })
+          handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
+          defaultResponder.invalid(ctx, validationError, source)
         }
       } else {
         handleFatal(err as Error)
@@ -253,6 +280,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     inputArranger: createSmartInputArranger(),
     createActionOptions: createNullActionOptions,
     constructConfig: defaultConstructConfig(),
+    defaultResponder: new StandardJsonResponder(),
     adapterRoot: './endpoint',
     adapterFileName: 'adapter',
     resourceRoot: './endpoint',

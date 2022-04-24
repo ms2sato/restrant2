@@ -128,6 +128,7 @@ export type ActionContext = {
   readonly body: express.Request['body']
   readonly query: express.Request['query']
   readonly format: string
+  readonly input: any
   readonly req: express.Request
   readonly res: express.Response
 }
@@ -139,6 +140,7 @@ export type MutableActionContext = ActionContext & {
 export class ActionContextImpl implements MutableActionContext {
   readonly render
   readonly redirect
+  private _input: any
 
   constructor(readonly req: express.Request, readonly res: express.Response) {
     // @see https://stackoverflow.com/questions/47647709/method-alias-with-typescript
@@ -156,19 +158,25 @@ export class ActionContextImpl implements MutableActionContext {
     return this.req.query
   }
 
+  get input() {
+    return this._input
+  }
   get format() {
     return this.req.params.format
   }
 
   mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
     const request = this.req as Record<string, any>
-    return sources.reduce((prev, source) => {
+    const input = sources.reduce((prev, source) => {
       if (request[source] === undefined) {
         return prev
       }
 
       return { ...prev, ...pred(request[source], source) }
     }, {})
+
+    this._input = input
+    return input
   }
 }
 
@@ -181,9 +189,9 @@ export type MultiOptionResponder = {
 }
 
 export type Responder<Opt = undefined, Out = any, Src = any> = {
-  success?: (ctx: ActionContext, output: Out, option: Opt) => unknown | Promise<unknown>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option: Opt) => void | Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, option: Opt) => void | Promise<void>
+  success?: (ctx: ActionContext, output: Out, option?: Opt) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option?: Opt) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, option?: Opt) => void | Promise<void>
 }
 
 export type RequestCallback<In = any> = {
@@ -210,6 +218,7 @@ export type ServerRouterConfig = {
   inputArranger: InputArranger
   createActionOptions: CreateActionOptionsFunction
   constructConfig: ConstructConfig
+  defaultResponder: Required<Responder>
   adapterRoot: string
   adapterFileName: string
   resourceRoot: string
