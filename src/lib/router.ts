@@ -209,9 +209,11 @@ export type Adapter<Opt = undefined, In = any> = {
 
 export class RouterError extends Error {}
 
-export type CreateActionOptionsFunction = {
-  (ctx: ActionContext, httpPath: string, ad: ActionDescriptor): Promise<any[]>
-}
+export type CreateActionOptionsFunction = (
+  ctx: ActionContext,
+  httpPath: string,
+  ad: ActionDescriptor
+) => any[] | Promise<any[]>
 
 export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
