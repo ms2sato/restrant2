@@ -149,6 +149,30 @@ class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Re
   }
 }
 
+type FatalHandler = (ctx: ActionContext, err: Error) => void
+
+class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
+  constructor(private fatalHandler: FatalHandler, private jsonResonder = new StandardJsonResponder()) {}
+
+  success(ctx: ActionContext, output: Out): void | Promise<void> {
+    return this.jsonResonder.success(ctx, output)
+  }
+
+  invalid(ctx: ActionContext, validationError: ValidationError, source: Src): void | Promise<void> {
+    return this.jsonResonder.invalid(ctx, validationError, source)
+  }
+
+  fatal(ctx: ActionContext, err: Error): void | Promise<void> {
+    console.error('fatal', err)
+    const contentType = ctx.req.headers['content-type']
+    if (ctx.format === 'json' || (contentType && contentType.indexOf('application/json') >= 0)) {
+      return this.jsonResonder.fatal(ctx, err)
+    }
+
+    this.fatalHandler(ctx, err)
+  }
+}
+
 const createResourceMethodHandler = ({
   resourceMethod,
   resource,
@@ -165,72 +189,83 @@ const createResourceMethodHandler = ({
   const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
-    const ctx = new ActionContextImpl(req, res)
-    const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
-    const handleFatal = async (err: Error) => {
-      if (responder && 'fatal' in responder) {
-        try {
-          handlerLog('%s#%s.fatal', adapterPath, actionName)
-          await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
-        } catch (er) {
-          defaultResponder.fatal(ctx, err)
-        }
-      } else {
-        return next(err)
-      }
-    }
-
-    let source
-
     try {
-      source = serverRouterConfig.inputArranger(ctx, sources, schema)
-      handlerLog('source: %o', source)
-    } catch (err) {
-      return handleFatal(err as Error)
-    }
+      const ctx = new ActionContextImpl(req, res)
+      const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
-    try {
-      if (responder && 'beforeValidation' in responder) {
-        source = await responder.beforeValidation!(ctx, source, schema)
-      }
-
-      let input = schema.parse(source)
-      if (responder && 'afterValidation' in responder) {
-        input = await responder.afterValidation!(ctx, input, schema)
-      }
-
-      routeLog('input', input)
-      const args = input ? [input, ...options] : options
-      handlerLog('resourceMethod args: %o', args)
-      const output = await resourceMethod.apply(resource, args)
-
-      if (responder && 'success' in responder) {
-        handlerLog('%s#%s.success', adapterPath, actionName)
-        await responder.success!.apply(adapter, [ctx, output, ...options])
-      } else {
-        handlerLog('%s#%s success by default responder', adapterPath, actionName)
-        defaultResponder.success(ctx, output)
-      }
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const validationError = err
-        handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
-        if (responder) {
-          if ('invalid' in responder) {
-            const filledSource = fillDefault(schema, source)
-            handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
-            res.status(422)
-            await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
-          } else {
-            next(validationError)
+      const handleFatal = async (err: Error) => {
+        if (responder && 'fatal' in responder) {
+          try {
+            handlerLog('%s#%s.fatal', adapterPath, actionName)
+            await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
+          } catch (er) {
+            console.log('Unexpected Error on responder.fatal, dispatch to default responder', er)
+            defaultResponder.fatal(ctx, err)
           }
         } else {
-          handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
-          defaultResponder.invalid(ctx, validationError, source)
+          return next(err)
         }
-      } else {
-        handleFatal(err as Error)
       }
+
+      try {
+        let source = serverRouterConfig.inputArranger(ctx, sources, schema)
+        handlerLog('source: %o', source)
+
+        try {
+          if (responder && 'beforeValidation' in responder) {
+            source = await responder.beforeValidation!(ctx, source, schema)
+          }
+
+          let input = schema.parse(source)
+          if (responder && 'afterValidation' in responder) {
+            input = await responder.afterValidation!(ctx, input, schema)
+          }
+
+          routeLog('input', input)
+          const args = input ? [input, ...options] : options
+          handlerLog('resourceMethod args: %o', args)
+          const output = await resourceMethod.apply(resource, args)
+
+          if (responder && 'success' in responder) {
+            handlerLog('%s#%s.success', adapterPath, actionName)
+            const ret = await responder.success!.apply(adapter, [ctx, output, ...options])
+            if (ret === false) {
+              handlerLog(' dispatch to default responder', adapterPath, actionName)
+              defaultResponder.success(ctx, output)
+            } else if (ret !== undefined) {
+              handlerLog(' dispatch to default responder for ret value', adapterPath, actionName)
+              defaultResponder.success(ctx, ret)
+            }
+          } else {
+            handlerLog('%s#%s success by default responder', adapterPath, actionName)
+            defaultResponder.success(ctx, output)
+          }
+        } catch (err) {
+          if (err instanceof z.ZodError) {
+            const validationError = err
+            handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
+            if (responder) {
+              if ('invalid' in responder) {
+                const filledSource = fillDefault(schema, source)
+                handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
+                res.status(422)
+                await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
+              } else {
+                next(validationError)
+              }
+            } else {
+              handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
+              defaultResponder.invalid(ctx, validationError, source)
+            }
+          } else {
+            handleFatal(err as Error)
+          }
+        }
+      } catch (err) {
+        return handleFatal(err as Error)
+      }
+    } catch (err) {
+      next(err)
     }
   }
 }
@@ -280,7 +315,9 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     inputArranger: createSmartInputArranger(),
     createActionOptions: createNullActionOptions,
     constructConfig: defaultConstructConfig(),
-    defaultResponder: new StandardJsonResponder(),
+    defaultResponder: new SmartResponder(() => {
+      throw new Error('Unimplemented Fatal Handler')
+    }, new StandardJsonResponder()),
     adapterRoot: './endpoint',
     adapterFileName: 'adapter',
     resourceRoot: './endpoint',

@@ -183,13 +183,13 @@ export class ActionContextImpl implements MutableActionContext {
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
-  success?: (ctx: ActionContext, output: any, ...options: any) => unknown | Promise<unknown>
+  success?: (ctx: ActionContext, output: any, ...options: any) => any | Promise<any>
   invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => void | Promise<void>
   fatal?: (ctx: ActionContext, err: Error, ...options: any) => void | Promise<void>
 }
 
 export type Responder<Opt = undefined, Out = any, Src = any> = {
-  success?: (ctx: ActionContext, output: Out, option?: Opt) => unknown | Promise<unknown>
+  success?: (ctx: ActionContext, output: Out, option?: Opt) => any | Promise<any>
   invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option?: Opt) => void | Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option?: Opt) => void | Promise<void>
 }
