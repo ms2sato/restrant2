@@ -10,7 +10,7 @@ export default defineAdapter((_support, _routeConfig): Adapter => {
         if (ctx.format === 'json') {
           ctx.res.json({ data: output, status: 'success' })
         } else {
-          ctx.render('tasks/index', { tasks: output })
+          return { tasks: output } // delegate to smart responder, will response by ctx.render('tasks/index', { tasks: output })
         }
       },
     },

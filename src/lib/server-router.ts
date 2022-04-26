@@ -19,7 +19,6 @@ import {
   Router,
   RouterError,
   ServerRouterConfig,
-  ConstructSource,
   RequestCallback,
   parseFormBody,
   createZodTraverseArrangerCreator,
@@ -27,6 +26,10 @@ import {
   deepCast,
   ValidationError,
   Responder,
+  ResourceMethodHandlerParams,
+  RouterCore,
+  HandlerBuildRunner,
+  Renderer,
 } from '../index'
 import { MutableActionContext } from './router'
 
@@ -107,19 +110,6 @@ export const createSmartInputArranger = (contentType2Arranger: ContentType2Arran
   }
 }
 
-type ResourceMethodHandlerParams = {
-  resourceMethod: Function
-  resource: any
-  sources: readonly ConstructSource[]
-  serverRouterConfig: ServerRouterConfig
-  httpPath: string
-  schema: z.AnyZodObject
-  adapterPath: string
-  actionDescriptor: ActionDescriptor
-  responder: MultiOptionResponder | RequestCallback
-  adapter: MultiOptionAdapter
-}
-
 // FIXME: @see https://google.github.io/styleguide/jsoncstyleguide.xml
 class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
   success(ctx: ActionContext, output: Out): void | Promise<void> {
@@ -152,9 +142,23 @@ class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Re
 type FatalHandler = (ctx: ActionContext, err: Error) => void
 
 class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
-  constructor(private fatalHandler: FatalHandler, private jsonResonder = new StandardJsonResponder()) {}
+  constructor(
+    private routerCore: RouterCore,
+    private fatalHandler: FatalHandler,
+    private jsonResonder = new StandardJsonResponder()
+  ) {}
 
   success(ctx: ActionContext, output: Out): void | Promise<void> {
+    const contentType = ctx.req.headers['content-type']
+    if (ctx.format === 'json' || (contentType && contentType.indexOf('application/json') >= 0)) {
+      return this.jsonResonder.success(ctx, output)
+    }
+
+    const renderer: Renderer = this.routerCore.page2Renderer[ctx.httpFilePath]
+    if (renderer !== undefined) {
+      return renderer(ctx, output)
+    }
+
     return this.jsonResonder.success(ctx, output)
   }
 
@@ -173,24 +177,36 @@ class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder
   }
 }
 
-const createResourceMethodHandler = ({
-  resourceMethod,
-  resource,
-  sources,
-  serverRouterConfig,
-  httpPath,
-  schema,
-  adapterPath,
-  actionDescriptor,
-  responder,
-  adapter,
-}: ResourceMethodHandlerParams): express.Handler => {
-  const defaultResponder = serverRouterConfig.defaultResponder
+const createSmartResponder = ({ routerCore }: ResourceMethodHandlerParams) => {
+  return new SmartResponder(
+    routerCore,
+    () => {
+      throw new Error('Unimplemented Fatal Handler')
+    },
+    new StandardJsonResponder()
+  )
+}
+
+const createResourceMethodHandler = (params: ResourceMethodHandlerParams): express.Handler => {
+  const {
+    resourceMethod,
+    resource,
+    sources,
+    serverRouterConfig,
+    httpPath,
+    schema,
+    adapterPath,
+    actionDescriptor,
+    responder,
+    adapter,
+  } = params
+
+  const defaultResponder = serverRouterConfig.createDefaultResponder(params)
   const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
     try {
-      const ctx = new ActionContextImpl(req, res)
+      const ctx = new ActionContextImpl(req, res, actionDescriptor, httpPath)
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
       const handleFatal = async (err: Error) => {
@@ -315,18 +331,12 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     inputArranger: createSmartInputArranger(),
     createActionOptions: createNullActionOptions,
     constructConfig: defaultConstructConfig(),
-    defaultResponder: new SmartResponder(() => {
-      throw new Error('Unimplemented Fatal Handler')
-    }, new StandardJsonResponder()),
+    createDefaultResponder: createSmartResponder,
     adapterRoot: './endpoint',
     adapterFileName: 'adapter',
     resourceRoot: './endpoint',
     resourceFileName: 'resource',
   }
-}
-
-type HandlerBuildRunner = {
-  (): Promise<void>
 }
 
 export abstract class BasicRouter implements Router {
@@ -336,7 +346,7 @@ export abstract class BasicRouter implements Router {
     readonly fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     readonly httpPath: string = '/',
-    protected readonly handlerBuildRunners: HandlerBuildRunner[] = []
+    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], page2Renderer: {} }
   ) {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
@@ -345,11 +355,11 @@ export abstract class BasicRouter implements Router {
   protected abstract createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
-    this.handlerBuildRunners.push(this.createHandlerBuildRunner(rpath, config))
+    this.routerCore.handlerBuildRunners.push(this.createHandlerBuildRunner(rpath, config))
   }
 
   async build() {
-    for (const requestHandlerSources of this.handlerBuildRunners) {
+    for (const requestHandlerSources of this.routerCore.handlerBuildRunners) {
       await requestHandlerSources()
     }
   }
@@ -382,9 +392,9 @@ export class ServerRouter extends BasicRouter {
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath: string = '/',
-    handlerBuildRunners: HandlerBuildRunner[] = []
+    readonly routerCore: RouterCore = { handlerBuildRunners: [], page2Renderer: {} }
   ) {
-    super(fileRoot, serverRouterConfig, httpPath, handlerBuildRunners)
+    super(fileRoot, serverRouterConfig, httpPath, routerCore)
     this.router = express.Router({ mergeParams: true })
   }
 
@@ -394,7 +404,7 @@ export class ServerRouter extends BasicRouter {
       this.fileRoot,
       this.serverRouterConfig,
       path.join(this.httpPath, args[0]),
-      this.handlerBuildRunners
+      this.routerCore
     )
     ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
     return subRouter
@@ -442,6 +452,16 @@ export class ServerRouter extends BasicRouter {
 
       for (const actionDescriptor of actionDescriptors) {
         const actionName = actionDescriptor.action
+        const httpPath = this.getHttpPath(rpath)
+
+        // TODO: Pluggable
+        if (actionDescriptor.page === true) {
+          const pagePath = path.join(httpPath, actionName)
+          this.routerCore.page2Renderer[pagePath] = (ctx: ActionContext, options) => {
+            // path fix for pug
+            ctx.render(pagePath.replace(/^\//, ''), options)
+          }
+        }
 
         const resourceMethod: Function | undefined = resource[actionName]
         const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
@@ -471,11 +491,10 @@ export class ServerRouter extends BasicRouter {
         const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
         let params
-        const urlPath = path.join(rpath, actionDescriptor.path)
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
-            const ctx = new ActionContextImpl(req, res)
+            const ctx = new ActionContextImpl(req, res, actionDescriptor, httpPath)
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
               await actionFunc(ctx)
@@ -508,6 +527,7 @@ export class ServerRouter extends BasicRouter {
             resource,
             sources,
             serverRouterConfig: this.serverRouterConfig,
+            routerCore: this.routerCore,
             httpPath: this.getHttpPath(rpath),
             schema,
             adapterPath,
@@ -518,6 +538,7 @@ export class ServerRouter extends BasicRouter {
           params = [handler]
         }
 
+        const urlPath = path.join(rpath, actionDescriptor.path)
         routeLog(
           '%s %s\t%s\t{actionOverride:%s, resourceMethod:%s}',
           actionDescriptor.method instanceof Array ? actionDescriptor.method.join(',') : actionDescriptor.method,

@@ -11,6 +11,7 @@ export type ActionDescriptor = {
   action: string
   path: string
   method: HttpMethod | readonly HttpMethod[]
+  page?: boolean
 }
 
 export type ConstructDescriptor = {
@@ -38,21 +39,25 @@ export namespace Actions {
     action: 'build',
     path: '/build',
     method: 'get',
+    page: true,
   } as const
   const edit: ActionDescriptor = {
     action: 'edit',
     path: '/:id/edit',
     method: 'get',
+    page: true,
   } as const
   const show: ActionDescriptor = {
     action: 'show',
     path: '/:id',
     method: 'get',
+    page: true,
   } as const
   const index: ActionDescriptor = {
     action: 'index',
     path: '/',
     method: 'get',
+    page: true,
   } as const
   const create: ActionDescriptor = {
     action: 'create',
@@ -70,7 +75,16 @@ export namespace Actions {
     method: 'delete',
   } as const
 
-  const all: readonly ActionDescriptor[] = [build, edit, show, index, create, update, destroy]
+  const apiShow: ActionDescriptor = {
+    action: 'show',
+    path: '/:id',
+    method: 'get',
+  } as const
+  const apiIndex: ActionDescriptor = {
+    action: 'index',
+    path: '/',
+    method: 'get',
+  } as const
 
   export type Option =
     | {
@@ -83,11 +97,12 @@ export namespace Actions {
       }
 
   export function standard(option?: Option): readonly ActionDescriptor[] {
-    return applyOption(all, option)
+    const actions = [build, edit, show, index, create, update, destroy]
+    return applyOption(actions, option)
   }
 
   export function api(option?: Option): readonly ActionDescriptor[] {
-    const actions = [show, index, create, update, destroy]
+    const actions = [apiShow, apiIndex, create, update, destroy]
     return applyOption(actions, option)
   }
 
@@ -107,14 +122,11 @@ export namespace Actions {
     throw new RouterError('Unreachable!')
   }
 
-  export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[] = all): ActionDescriptor[] {
+  export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[]): ActionDescriptor[] {
     return sources.filter((ad) => actions.includes(ad.action as ActionName))
   }
 
-  export function except(
-    actions: readonly ActionName[],
-    sources: readonly ActionDescriptor[] = all
-  ): ActionDescriptor[] {
+  export function except(actions: readonly ActionName[], sources: readonly ActionDescriptor[]): ActionDescriptor[] {
     return sources.filter((ad) => !actions.includes(ad.action as ActionName))
   }
 }
@@ -131,6 +143,9 @@ export type ActionContext = {
   readonly input: any
   readonly req: express.Request
   readonly res: express.Response
+  readonly httpPath: string
+  readonly httpFilePath: string
+  readonly actionDescriptor: ActionDescriptor
 }
 
 export type MutableActionContext = ActionContext & {
@@ -142,7 +157,12 @@ export class ActionContextImpl implements MutableActionContext {
   readonly redirect
   private _input: any
 
-  constructor(readonly req: express.Request, readonly res: express.Response) {
+  constructor(
+    readonly req: express.Request,
+    readonly res: express.Response,
+    readonly actionDescriptor: ActionDescriptor,
+    readonly httpPath: string
+  ) {
     // @see https://stackoverflow.com/questions/47647709/method-alias-with-typescript
     this.render = this.res.render.bind(this.res)
     this.redirect = this.res.redirect.bind(this.res)
@@ -163,6 +183,9 @@ export class ActionContextImpl implements MutableActionContext {
   }
   get format() {
     return this.req.params.format
+  }
+  get httpFilePath() {
+    return `${this.httpPath}/${this.actionDescriptor.action}`
   }
 
   mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
@@ -215,12 +238,38 @@ export type CreateActionOptionsFunction = (
   ad: ActionDescriptor
 ) => any[] | Promise<any[]>
 
+export type HandlerBuildRunner = () => Promise<void>
+export type Renderer = (ctx: ActionContext, options: any) => void
+
+type Page2Renderer = {
+  [key: string]: Renderer
+}
+
+export type RouterCore = {
+  handlerBuildRunners: HandlerBuildRunner[]
+  page2Renderer: Page2Renderer
+}
+
+export type ResourceMethodHandlerParams = {
+  resourceMethod: Function
+  resource: any
+  sources: readonly ConstructSource[]
+  serverRouterConfig: ServerRouterConfig
+  routerCore: RouterCore
+  httpPath: string
+  schema: z.AnyZodObject
+  adapterPath: string
+  actionDescriptor: ActionDescriptor
+  responder: MultiOptionResponder | RequestCallback
+  adapter: MultiOptionAdapter
+}
+
 export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
   createActionOptions: CreateActionOptionsFunction
   constructConfig: ConstructConfig
-  defaultResponder: Required<Responder>
+  createDefaultResponder: (params: ResourceMethodHandlerParams) => Required<Responder>
   adapterRoot: string
   adapterFileName: string
   resourceRoot: string
