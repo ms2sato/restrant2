@@ -149,14 +149,12 @@ class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder
   ) {}
 
   success(ctx: ActionContext, output: Out): void | Promise<void> {
-    const contentType = ctx.req.headers['content-type']
-    if (ctx.format === 'json' || (contentType && contentType.indexOf('application/json') >= 0)) {
+    if (ctx.willRespondJson()) {
       return this.jsonResonder.success(ctx, output)
     }
 
-    const renderer: Renderer = this.routerCore.page2Renderer[ctx.httpFilePath]
-    if (renderer !== undefined) {
-      return renderer(ctx, output)
+    if (renderDefault(ctx, output) !== false) {
+      return
     }
 
     return this.jsonResonder.success(ctx, output)
@@ -168,8 +166,7 @@ class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder
 
   fatal(ctx: ActionContext, err: Error): void | Promise<void> {
     console.error('fatal', err)
-    const contentType = ctx.req.headers['content-type']
-    if (ctx.format === 'json' || (contentType && contentType.indexOf('application/json') >= 0)) {
+    if (ctx.willRespondJson()) {
       return this.jsonResonder.fatal(ctx, err)
     }
 
@@ -286,8 +283,16 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   }
 }
 
-const createNullActionOptions: CreateActionOptionsFunction = async (ctx, httpPath, ad) => {
+export const createNullActionOptions: CreateActionOptionsFunction = async (ctx, httpPath, ad) => {
   return []
+}
+
+export function renderDefault(ctx: ActionContext, options: any) {
+  if (!ctx.descriptor.page) {
+    return false
+  }
+
+  ctx.render(ctx.httpFilePath.replace(/^\//, ''), options)
 }
 
 export const importAndSetup = async (
@@ -332,6 +337,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     createActionOptions: createNullActionOptions,
     constructConfig: defaultConstructConfig(),
     createDefaultResponder: createSmartResponder,
+    renderDefault: renderDefault,
     adapterRoot: './endpoint',
     adapterFileName: 'adapter',
     resourceRoot: './endpoint',
@@ -346,13 +352,13 @@ export abstract class BasicRouter implements Router {
     readonly fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     readonly httpPath: string = '/',
-    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], page2Renderer: {} }
+    protected readonly routerCore: RouterCore = { handlerBuildRunners: [] }
   ) {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
 
   abstract sub(...args: any[]): Router
-  protected abstract createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner
+  protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
     this.routerCore.handlerBuildRunners.push(this.createHandlerBuildRunner(rpath, config))
@@ -392,7 +398,7 @@ export class ServerRouter extends BasicRouter {
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath: string = '/',
-    readonly routerCore: RouterCore = { handlerBuildRunners: [], page2Renderer: {} }
+    readonly routerCore: RouterCore = { handlerBuildRunners: [] }
   ) {
     super(fileRoot, serverRouterConfig, httpPath, routerCore)
     this.router = express.Router({ mergeParams: true })
@@ -410,7 +416,7 @@ export class ServerRouter extends BasicRouter {
     return subRouter
   }
 
-  protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
+  protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
     const choiceSchema = (
       constructDescriptor: ConstructDescriptor | undefined,
       defaultConstructDescriptor: ConstructDescriptor,
@@ -437,7 +443,7 @@ export class ServerRouter extends BasicRouter {
         this.fileRoot,
         resourcePath,
         new ResourceSupport(this.fileRoot, this.serverRouterConfig),
-        config
+        routeConfig
       )
 
       const adapterPath = this.getAdapterPath(rpath)
@@ -445,27 +451,18 @@ export class ServerRouter extends BasicRouter {
         this.fileRoot,
         adapterPath,
         new ActionSupport(this.fileRoot, this.serverRouterConfig),
-        config
+        routeConfig
       )
 
-      const actionDescriptors: readonly ActionDescriptor[] = config.actions || this.serverRouterConfig.actions
+      const actionDescriptors: readonly ActionDescriptor[] = routeConfig.actions || this.serverRouterConfig.actions
 
       for (const actionDescriptor of actionDescriptors) {
         const actionName = actionDescriptor.action
-        const httpPath = this.getHttpPath(rpath)
-
-        // TODO: Pluggable
-        if (actionDescriptor.page === true) {
-          const pagePath = path.join(httpPath, actionName)
-          this.routerCore.page2Renderer[pagePath] = (ctx: ActionContext, options) => {
-            // path fix for pug
-            ctx.render(pagePath.replace(/^\//, ''), options)
-          }
-        }
+        const resourceHttpPath = this.getHttpPath(rpath)
 
         const resourceMethod: Function | undefined = resource[actionName]
         const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
-        const constructDescriptor: ConstructDescriptor | undefined = config.construct?.[actionName]
+        const constructDescriptor: ConstructDescriptor | undefined = routeConfig.construct?.[actionName]
 
         const actionOverride = actionFunc instanceof Function
         if (!actionOverride) {
@@ -494,7 +491,7 @@ export class ServerRouter extends BasicRouter {
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
-            const ctx = new ActionContextImpl(req, res, actionDescriptor, httpPath)
+            const ctx = new ActionContextImpl(req, res, actionDescriptor, resourceHttpPath)
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
               await actionFunc(ctx)
@@ -528,7 +525,7 @@ export class ServerRouter extends BasicRouter {
             sources,
             serverRouterConfig: this.serverRouterConfig,
             routerCore: this.routerCore,
-            httpPath: this.getHttpPath(rpath),
+            httpPath: resourceHttpPath,
             schema,
             adapterPath,
             actionDescriptor,

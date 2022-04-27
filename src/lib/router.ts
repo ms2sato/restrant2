@@ -145,7 +145,8 @@ export type ActionContext = {
   readonly res: express.Response
   readonly httpPath: string
   readonly httpFilePath: string
-  readonly actionDescriptor: ActionDescriptor
+  readonly descriptor: ActionDescriptor
+  readonly willRespondJson: () => boolean
 }
 
 export type MutableActionContext = ActionContext & {
@@ -160,7 +161,7 @@ export class ActionContextImpl implements MutableActionContext {
   constructor(
     readonly req: express.Request,
     readonly res: express.Response,
-    readonly actionDescriptor: ActionDescriptor,
+    readonly descriptor: ActionDescriptor,
     readonly httpPath: string
   ) {
     // @see https://stackoverflow.com/questions/47647709/method-alias-with-typescript
@@ -185,7 +186,12 @@ export class ActionContextImpl implements MutableActionContext {
     return this.req.params.format
   }
   get httpFilePath() {
-    return `${this.httpPath}/${this.actionDescriptor.action}`
+    return `${this.httpPath}/${this.descriptor.action}`
+  }
+
+  willRespondJson() {
+    const contentType = this.req.headers['content-type']
+    return this.format === 'json' || (contentType !== undefined && contentType.indexOf('application/json') >= 0)
   }
 
   mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
@@ -239,15 +245,10 @@ export type CreateActionOptionsFunction = (
 ) => any[] | Promise<any[]>
 
 export type HandlerBuildRunner = () => Promise<void>
-export type Renderer = (ctx: ActionContext, options: any) => void
-
-type Page2Renderer = {
-  [key: string]: Renderer
-}
+export type Renderer = (ctx: ActionContext, options: any) => boolean | undefined
 
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
-  page2Renderer: Page2Renderer
 }
 
 export type ResourceMethodHandlerParams = {
@@ -270,6 +271,7 @@ export type ServerRouterConfig = {
   createActionOptions: CreateActionOptionsFunction
   constructConfig: ConstructConfig
   createDefaultResponder: (params: ResourceMethodHandlerParams) => Required<Responder>
+  renderDefault: Renderer
   adapterRoot: string
   adapterFileName: string
   resourceRoot: string
