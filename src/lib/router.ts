@@ -1,5 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
+import { ServerRouter } from './server-router'
 
 export { z }
 
@@ -245,7 +246,11 @@ export type CreateActionOptionsFunction = (
 ) => any[] | Promise<any[]>
 
 export type HandlerBuildRunner = () => Promise<void>
-export type Renderer = (ctx: ActionContext, options: any) => boolean | undefined
+
+/**
+ * @returns If not rendered return false.
+ */
+export type Renderer = (ctx: ActionContext, options: any) => false | undefined
 
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
@@ -255,8 +260,7 @@ export type ResourceMethodHandlerParams = {
   resourceMethod: Function
   resource: any
   sources: readonly ConstructSource[]
-  serverRouterConfig: ServerRouterConfig
-  routerCore: RouterCore
+  router: ServerRouter
   httpPath: string
   schema: z.AnyZodObject
   adapterPath: string

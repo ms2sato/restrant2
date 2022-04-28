@@ -29,7 +29,6 @@ import {
   ResourceMethodHandlerParams,
   RouterCore,
   HandlerBuildRunner,
-  Renderer,
 } from '../index'
 import { MutableActionContext } from './router'
 
@@ -143,7 +142,7 @@ type FatalHandler = (ctx: ActionContext, err: Error) => void
 
 class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
   constructor(
-    private routerCore: RouterCore,
+    private router: ServerRouter,
     private fatalHandler: FatalHandler,
     private jsonResonder = new StandardJsonResponder()
   ) {}
@@ -153,11 +152,9 @@ class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder
       return this.jsonResonder.success(ctx, output)
     }
 
-    if (renderDefault(ctx, output) !== false) {
-      return
+    if (this.router.serverRouterConfig.renderDefault(ctx, output) === false) {
+      return this.jsonResonder.success(ctx, output)
     }
-
-    return this.jsonResonder.success(ctx, output)
   }
 
   invalid(ctx: ActionContext, validationError: ValidationError, source: Src): void | Promise<void> {
@@ -174,9 +171,9 @@ class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder
   }
 }
 
-const createSmartResponder = ({ routerCore }: ResourceMethodHandlerParams) => {
+const createSmartResponder = ({ router }: ResourceMethodHandlerParams) => {
   return new SmartResponder(
-    routerCore,
+    router,
     () => {
       throw new Error('Unimplemented Fatal Handler')
     },
@@ -189,7 +186,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
     resourceMethod,
     resource,
     sources,
-    serverRouterConfig,
+    router: { serverRouterConfig },
     httpPath,
     schema,
     adapterPath,
@@ -346,7 +343,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
 }
 
 export abstract class BasicRouter implements Router {
-  protected readonly serverRouterConfig: ServerRouterConfig
+  readonly serverRouterConfig: ServerRouterConfig
 
   constructor(
     readonly fileRoot: string,
@@ -523,8 +520,7 @@ export class ServerRouter extends BasicRouter {
             resourceMethod,
             resource,
             sources,
-            serverRouterConfig: this.serverRouterConfig,
-            routerCore: this.routerCore,
+            router: this,
             httpPath: resourceHttpPath,
             schema,
             adapterPath,
