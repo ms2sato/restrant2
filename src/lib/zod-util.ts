@@ -13,14 +13,15 @@ export type ArrangeResult =
 const nullArrangeResult = { arranged: false, result: undefined }
 export { nullArrangeResult }
 
-export function stripDefault(schema: z.AnyZodObject) {
-  if (schema instanceof z.ZodDefault) {
-    return (schema._def as any).innerType
+export function strip(schema: z.AnyZodObject): z.AnyZodObject {
+  if (schema instanceof z.ZodDefault || schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+    return strip((schema._def as any).innerType)
   }
   return schema
 }
 
 export function cast(schema: z.AnyZodObject, value: any): ArrangeResult {
+  console.log(schema, value)
   try {
     if (schema instanceof z.ZodBigInt && typeof value !== 'bigint') {
       return { arranged: true, result: BigInt(value) }
@@ -96,14 +97,14 @@ export function isValue(obj: any): boolean {
 
 export function deepCast(schema: z.AnyZodObject, obj: any) {
   if (isValue(obj)) {
-    const ret = cast(stripDefault(schema), obj)
+    const ret = cast(strip(schema), obj)
     return ret.arranged ? ret.result : obj
   }
 
   if (obj instanceof Array) {
-    const arraySchema = stripDefault(schema)
+    const arraySchema = strip(schema)
     if (arraySchema instanceof z.ZodArray) {
-      const itemSchema = stripDefault(arraySchema.element)
+      const itemSchema = strip(arraySchema.element)
       obj.forEach((item, index) => {
         obj[index] = deepCast(itemSchema, item)
       })
@@ -112,7 +113,7 @@ export function deepCast(schema: z.AnyZodObject, obj: any) {
   }
 
   for (const [key, val] of Object.entries<any>(obj)) {
-    const itemSchema = stripDefault(schema).shape[key]
+    const itemSchema = strip(schema).shape[key]
     if (itemSchema) {
       obj[key] = deepCast(itemSchema, val)
     }
