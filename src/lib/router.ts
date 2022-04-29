@@ -154,62 +154,6 @@ export type MutableActionContext = ActionContext & {
   mergeInputs(sources: readonly string[], pred?: (input: any, source: string) => any): any
 }
 
-export class ActionContextImpl implements MutableActionContext {
-  readonly render
-  readonly redirect
-  private _input: any
-
-  constructor(
-    readonly req: express.Request,
-    readonly res: express.Response,
-    readonly descriptor: ActionDescriptor,
-    readonly httpPath: string
-  ) {
-    // @see https://stackoverflow.com/questions/47647709/method-alias-with-typescript
-    this.render = this.res.render.bind(this.res)
-    this.redirect = this.res.redirect.bind(this.res)
-  }
-
-  get params() {
-    return this.req.params
-  }
-  get body() {
-    return this.req.body
-  }
-  get query() {
-    return this.req.query
-  }
-
-  get input() {
-    return this._input
-  }
-  get format() {
-    return this.req.params.format
-  }
-  get httpFilePath() {
-    return `${this.httpPath}/${this.descriptor.action}`
-  }
-
-  willRespondJson() {
-    const contentType = this.req.headers['content-type']
-    return this.format === 'json' || (contentType !== undefined && contentType.indexOf('application/json') >= 0)
-  }
-
-  mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
-    const request = this.req as Record<string, any>
-    const input = sources.reduce((prev, source) => {
-      if (request[source] === undefined) {
-        return prev
-      }
-
-      return { ...prev, ...pred(request[source], source) }
-    }, {})
-
-    this._input = input
-    return input
-  }
-}
-
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
