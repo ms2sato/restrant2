@@ -135,7 +135,7 @@ export namespace Actions {
 export type ValidationError = z.ZodError
 
 export type ActionContext = {
-  readonly render: express.Response['render']
+  render: express.Response['render']
   readonly redirect: express.Response['redirect']
   readonly params: express.Request['params']
   readonly body: express.Request['body']
@@ -153,6 +153,13 @@ export type ActionContext = {
 export type MutableActionContext = ActionContext & {
   mergeInputs(sources: readonly string[], pred?: (input: any, source: string) => any): any
 }
+
+export type ActionContextCreator = (
+  req: express.Request,
+  res: express.Response,
+  descriptor: ActionDescriptor,
+  httpPath: string
+) => MutableActionContext
 
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
@@ -217,6 +224,7 @@ export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
   createActionOptions: CreateActionOptionsFunction
+  createActionContext: ActionContextCreator
   constructConfig: ConstructConfig
   createDefaultResponder: (params: ResourceMethodHandlerParams) => Required<Responder>
   renderDefault: Renderer

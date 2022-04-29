@@ -4,6 +4,7 @@ import { z } from 'zod'
 import debug from 'debug'
 import {
   ActionContext,
+  ActionContextCreator,
   ActionDescriptor,
   Actions,
   ActionSupport,
@@ -199,7 +200,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 
   return async (req, res, next) => {
     try {
-      const ctx = new ActionContextImpl(req, res, actionDescriptor, httpPath)
+      const ctx = serverRouterConfig.createActionContext(req, res, actionDescriptor, httpPath)
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
       const handleFatal = async (err: Error) => {
@@ -326,9 +327,18 @@ export const importAndSetup = async (
   }
 }
 
-class ActionContextImpl implements MutableActionContext {
-  readonly render
-  readonly redirect
+export const createDefaultActionContext: ActionContextCreator = (
+  req: express.Request,
+  res: express.Response,
+  descriptor: ActionDescriptor,
+  httpPath: string
+) => {
+  return new ActionContextImpl(req, res, descriptor, httpPath)
+}
+
+export class ActionContextImpl implements MutableActionContext {
+  render
+  redirect
   private _input: any
 
   constructor(
@@ -387,6 +397,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     actions: Actions.standard(),
     inputArranger: createSmartInputArranger(),
     createActionOptions: createNullActionOptions,
+    createActionContext: createDefaultActionContext,
     constructConfig: defaultConstructConfig(),
     createDefaultResponder: createSmartResponder,
     renderDefault: renderDefault,
@@ -543,7 +554,7 @@ export class ServerRouter extends BasicRouter {
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
-            const ctx = new ActionContextImpl(req, res, actionDescriptor, resourceHttpPath)
+            const ctx = this.serverRouterConfig.createActionContext(req, res, actionDescriptor, resourceHttpPath)
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
               await actionFunc(ctx)
