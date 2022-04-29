@@ -21,7 +21,6 @@ export function strip(schema: z.AnyZodObject): z.AnyZodObject {
 }
 
 export function cast(schema: z.AnyZodObject, value: any): ArrangeResult {
-  console.log(schema, value)
   try {
     if (schema instanceof z.ZodBigInt && typeof value !== 'bigint') {
       return { arranged: true, result: BigInt(value) }

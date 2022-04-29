@@ -231,7 +231,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
             input = await responder.afterValidation!(ctx, input, schema)
           }
 
-          routeLog('input', input)
+          handlerLog('input', input)
           const args = input ? [input, ...options] : options
           handlerLog('resourceMethod args: %o', args)
           const output = await resourceMethod.apply(resource, args)
