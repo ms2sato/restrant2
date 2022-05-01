@@ -154,12 +154,14 @@ export type MutableActionContext = ActionContext & {
   mergeInputs(sources: readonly string[], pred?: (input: any, source: string) => any): any
 }
 
-export type ActionContextCreator = (
-  req: express.Request,
-  res: express.Response,
-  descriptor: ActionDescriptor,
+export type ActionContextProps = {
+  req: express.Request
+  res: express.Response
+  descriptor: ActionDescriptor
   httpPath: string
-) => MutableActionContext
+}
+
+export type ActionContextCreator = (props: ActionContextProps) => MutableActionContext
 
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 

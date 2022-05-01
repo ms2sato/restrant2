@@ -112,7 +112,13 @@ export const createSmartInputArranger = (contentType2Arranger: ContentType2Arran
 // FIXME: @see https://google.github.io/styleguide/jsoncstyleguide.xml
 class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
   success(ctx: ActionContext, output: Out): void | Promise<void> {
-    ctx.res.json({ status: 'success', data: output })
+    let data = output
+    if ('ctx' in output) {
+      data = { ...output }
+      delete (data as any).ctx
+    }
+
+    ctx.res.json({ status: 'success', data })
   }
 
   invalid(ctx: ActionContext, validationError: ValidationError, source: Src): void | Promise<void> {
@@ -200,7 +206,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 
   return async (req, res, next) => {
     try {
-      const ctx = serverRouterConfig.createActionContext(req, res, actionDescriptor, httpPath)
+      const ctx = serverRouterConfig.createActionContext({ req, res, descriptor: actionDescriptor, httpPath })
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
       const handleFatal = async (err: Error) => {
@@ -327,12 +333,7 @@ export const importAndSetup = async (
   }
 }
 
-export const createDefaultActionContext: ActionContextCreator = (
-  req: express.Request,
-  res: express.Response,
-  descriptor: ActionDescriptor,
-  httpPath: string
-) => {
+export const createDefaultActionContext: ActionContextCreator = ({ req, res, descriptor, httpPath }) => {
   return new ActionContextImpl(req, res, descriptor, httpPath)
 }
 
@@ -554,7 +555,12 @@ export class ServerRouter extends BasicRouter {
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
-            const ctx = this.serverRouterConfig.createActionContext(req, res, actionDescriptor, resourceHttpPath)
+            const ctx = this.serverRouterConfig.createActionContext({
+              req,
+              res,
+              descriptor: actionDescriptor,
+              httpPath: resourceHttpPath,
+            })
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
               await actionFunc(ctx)
