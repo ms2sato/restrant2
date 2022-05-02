@@ -8,8 +8,8 @@
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "scripts": {
-    "watch": "npx tsc -w",
-    "build": "npx tsc",
+    "watch": "npm run clean && npx tsc -w",
+    "build": "npm run clean && npx tsc",
     "check-types": "npx tsc --noEmit",
     "eslint": "npx eslint src/index.ts",
     "eslint:fix": "npx eslint src/index.ts --fix",
@@ -17,7 +17,7 @@
     "lint:fix": "npm run eslint:fix && npm run check-types && npm run format",
     "format": "npx prettier --write 'src/**/*.{js,ts,json}'",
     "clean": "npx rimraf dist",
-    "package": "npm run clean && npm run build && npm pack",
+    "package": "npm run build && npm pack",
     "test": "npx jest",
     "test:watch": "npx jest --watch"
   },

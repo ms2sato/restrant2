@@ -6,7 +6,8 @@
     "strict": true,
     "lib": ["esnext"],
     "declaration": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "moduleResolution": "Node"
   },
   "include": [
     "src"
