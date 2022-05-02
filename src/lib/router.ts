@@ -203,7 +203,7 @@ export type HandlerBuildRunner = () => Promise<void>
 /**
  * @returns If not rendered return false.
  */
-export type Renderer = (ctx: ActionContext, options: any) => false | undefined
+export type Renderer = (ctx: ActionContext, options?: any) => false | undefined
 
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]

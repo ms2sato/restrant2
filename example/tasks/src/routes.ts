@@ -15,7 +15,11 @@ export function routes(router: Router) {
       done: { schema: idNumberSchema },
     },
     name: 'task',
-    actions: [...Actions.standard({ except: ['show'] }), { action: 'done', path: '/:id/done', method: 'post' }],
+    actions: [
+      ...Actions.standard({ except: ['show'] }),
+      { action: 'done', path: '/:id/done', method: 'post' },
+      { action: 'about', path: '/about', method: 'get', page: true },
+    ],
   })
 
   const adminRouter = router.sub('/admins/:adminId')

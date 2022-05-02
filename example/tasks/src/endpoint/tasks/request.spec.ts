@@ -123,6 +123,11 @@ test('POST /:id/done', async () => {
   }
 })
 
+test('GET /about', async () => {
+  const response = await request(app).get('/tasks/about')
+  expect(response.text).toMatch('<h1>About</h1')
+})
+
 test('POST / invalid', async () => {
   const response = await request(app).post('/tasks/').type('form').send({
     title: '',

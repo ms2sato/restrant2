@@ -290,7 +290,7 @@ export const createNullActionOptions: CreateActionOptionsFunction = async (ctx, 
   return []
 }
 
-export function renderDefault(ctx: ActionContext, options: any) {
+export function renderDefault(ctx: ActionContext, options: any = undefined) {
   if (!ctx.descriptor.page) {
     return false
   }
@@ -530,9 +530,9 @@ export class ServerRouter extends BasicRouter {
 
         const actionOverride = actionFunc instanceof Function
         if (!actionOverride) {
-          if (resourceMethod === undefined) {
+          if (resourceMethod === undefined && !actionDescriptor.page) {
             throw new RouterError(
-              `Logic not found! define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
+              `Logic not found! define action.page option on routes, or define ${resourcePath}#${actionName} or/and ${adapterPath}#${actionName}`
             )
           }
         }
@@ -572,35 +572,54 @@ export class ServerRouter extends BasicRouter {
           params = [handler]
         } else {
           if (!resourceMethod) {
-            throw new Error('Unreachable: resourceMethod is undefined')
+            if (!actionDescriptor.page) {
+              throw new Error('Unreachable: resourceMethod is undefined and action.page not set')
+            }
+
+            const handler: express.Handler = async (req, res, next) => {
+              const ctx = this.serverRouterConfig.createActionContext({
+                req,
+                res,
+                descriptor: actionDescriptor,
+                httpPath: resourceHttpPath,
+              })
+              try {
+                handlerLog('page: %s', ctx.httpFilePath)
+                await this.serverRouterConfig.renderDefault(ctx)
+              } catch (err) {
+                next(err)
+              }
+            }
+
+            params = [handler]
+          } else {
+            if (!schema) {
+              throw new Error('Unreachable: schema is undefined')
+            }
+
+            const sources = constructDescriptor?.sources || defaultSources
+            handlerLog(
+              '%s#%s  with construct middleware; schema: %s, sources: %o',
+              adapterPath,
+              actionName,
+              schema.constructor.name,
+              sources
+            )
+
+            const handler: express.Handler = createResourceMethodHandler({
+              resourceMethod,
+              resource,
+              sources,
+              router: this,
+              httpPath: resourceHttpPath,
+              schema,
+              adapterPath,
+              actionDescriptor,
+              responder: actionFunc,
+              adapter,
+            })
+            params = [handler]
           }
-
-          if (!schema) {
-            throw new Error('Unreachable: schema is undefined')
-          }
-
-          const sources = constructDescriptor?.sources || defaultSources
-          handlerLog(
-            '%s#%s  with construct middleware; schema: %s, sources: %o',
-            adapterPath,
-            actionName,
-            schema.constructor.name,
-            sources
-          )
-
-          const handler: express.Handler = createResourceMethodHandler({
-            resourceMethod,
-            resource,
-            sources,
-            router: this,
-            httpPath: resourceHttpPath,
-            schema,
-            adapterPath,
-            actionDescriptor,
-            responder: actionFunc,
-            adapter,
-          })
-          params = [handler]
         }
 
         const urlPath = path.join(rpath, actionDescriptor.path)
