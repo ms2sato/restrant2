@@ -461,7 +461,7 @@ export class ServerRouter extends BasicRouter {
   constructor(
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
-    httpPath: string = '/',
+    httpPath = '/',
     readonly routerCore: RouterCore = { handlerBuildRunners: [] }
   ) {
     super(fileRoot, serverRouterConfig, httpPath, routerCore)

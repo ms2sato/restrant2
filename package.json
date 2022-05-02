@@ -3,13 +3,14 @@
   "version": "0.0.2",
   "description": "",
   "files": [
-    "src", "tsconfig*"
+    "dist"
   ],
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "scripts": {
     "watch": "npm run clean && npx tsc -w",
-    "build": "npm run clean && npx tsc",
+    "prebuild": "npm run clean",
+    "build": "npx tsc",
     "check-types": "npx tsc --noEmit",
     "eslint": "npx eslint src/index.ts",
     "eslint:fix": "npx eslint src/index.ts --fix",
