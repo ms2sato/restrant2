@@ -19,7 +19,8 @@
     "clean": "npx rimraf dist",
     "package": "npm run build && npm pack",
     "test": "npx jest",
-    "test:watch": "npx jest --watch"
+    "test:watch": "npx jest --watch",
+    "prepare": "npm run build"
   },
   "keywords": [],
   "author": "ms2sato",
