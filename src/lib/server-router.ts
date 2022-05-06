@@ -42,7 +42,10 @@ export type BlankParams = z.infer<typeof blankSchema>
 export const idNumberSchema = z.object({
   id: z.number(),
 })
+
 export type IdNumberParams = z.infer<typeof idNumberSchema>
+
+export type PrimaryKeyParams<T, N extends string = 'id'> = { [P in N]: T }
 
 // for express-fileupload
 export const uploadedFileSchema = z.object({
