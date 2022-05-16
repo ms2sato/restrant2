@@ -7,7 +7,7 @@
     "start": "node dist/index",
     "build": "npx tsc",
     "clean": "npx rimraf dist",
-    "dev": "DEBUG=restrant2:*,tasks:* nodemon src/index.ts",
+    "dev": "DEBUG=restrant2:*,tasks:* tsc-watch --onSuccess 'node dist/index'",
     "lint": "npm run eslint && npm run check-types",
     "lint:fix": "npm run eslint:fix && npm run check-types && npm run format",
     "test": "npx jest",
@@ -40,13 +40,13 @@
     "eslint": "^8.12.0",
     "eslint-config-prettier": "8.4.0",
     "express-routemap": "^1.6.0",
-    "jest": "^27.5.1",
-    "nodemon": "^2.0.15",
+    "jest": "^28.1.0",
     "prettier": "2.5.1",
     "rimraf": "^3.0.2",
     "supertest": "^6.2.2",
-    "ts-jest": "^27.1.4",
+    "ts-jest": "^28.0.2",
     "ts-node": "^10.5.0",
-    "typescript": "^4.6.2"
+    "tsc-watch": "^5.0.3",
+    "typescript": "^4.7.1-rc"
   }
 }

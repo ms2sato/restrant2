@@ -5,8 +5,18 @@
   "files": [
     "dist"
   ],
-  "types": "dist/index.d.ts",
-  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require" : "./dist/index.js"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "require" : "./dist/client.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
   "scripts": {
     "watch": "npm run clean && npx tsc -w",
     "prebuild": "npm run clean",
@@ -39,7 +49,7 @@
     "prettier": "2.5.1",
     "rimraf": "^3.0.2",
     "ts-jest": "^27.1.4",
-    "typescript": "^4.6.2"
+    "typescript": "^4.7.1-rc"
   },
   "dependencies": {
     "debug": "^4.3.3",
