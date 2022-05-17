@@ -1,3 +1,3 @@
-export function test() {
-  console.log('This is exported!')
-}
+import { z } from 'zod'
+
+export type ValidationError = z.ZodError

@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { ServerRouter } from './server-router'
+import { ValidationError } from '../client'
 
 export { z }
 
@@ -131,8 +132,6 @@ export namespace Actions {
     return sources.filter((ad) => !actions.includes(ad.action as ActionName))
   }
 }
-
-export type ValidationError = z.ZodError
 
 export type ActionContext = {
   render: express.Response['render']

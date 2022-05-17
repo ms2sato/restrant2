@@ -2,6 +2,7 @@ import express from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
+import { ValidationError } from '../client'
 import {
   ActionContext,
   ActionContextCreator,
@@ -24,7 +25,6 @@ import {
   createZodTraverseArrangerCreator,
   fillDefault,
   deepCast,
-  ValidationError,
   Responder,
   ResourceMethodHandlerParams,
   RouterCore,
