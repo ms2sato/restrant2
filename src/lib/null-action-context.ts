@@ -1,4 +1,5 @@
 import express from 'express'
+import { Resource } from '../client'
 import { ActionContext, ActionDescriptor } from './router'
 
 export class NullActionContext implements ActionContext {
@@ -42,6 +43,9 @@ export class NullActionContext implements ActionContext {
     throw new Error(this.errorMessage)
   }
   willRespondJson(): boolean {
+    throw new Error(this.errorMessage)
+  }
+  resourceOf(name: string): Resource {
     throw new Error(this.errorMessage)
   }
 }

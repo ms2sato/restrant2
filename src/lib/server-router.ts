@@ -2,7 +2,7 @@ import express from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
-import { ValidationError } from '../client'
+import { ValidationError, ResourceMethod } from '../client'
 import {
   ActionContext,
   ActionContextCreator,
@@ -32,7 +32,7 @@ import {
   Resource,
   EndpointFunc,
 } from '../index'
-import { MutableActionContext, ResourceMethod } from './router'
+import { MutableActionContext } from './router'
 import { isImportError } from './type-util'
 
 const log = debug('restrant2')
@@ -198,7 +198,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
     resourceMethod,
     resource,
     sources,
-    router: { serverRouterConfig },
+    router,
     httpPath,
     schema,
     adapterPath,
@@ -207,12 +207,13 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
     adapter,
   } = params
 
+  const serverRouterConfig = router.serverRouterConfig
   const defaultResponder = serverRouterConfig.createDefaultResponder(params)
   const actionName = actionDescriptor.action
 
   return async (req, res, next) => {
     try {
-      const ctx = serverRouterConfig.createActionContext({ req, res, descriptor: actionDescriptor, httpPath })
+      const ctx = serverRouterConfig.createActionContext({ router, req, res, descriptor: actionDescriptor, httpPath })
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
       const handleFatal = async (err: Error) => {
@@ -336,8 +337,8 @@ export const importAndSetup = async <S, R>(
   }
 }
 
-export const createDefaultActionContext: ActionContextCreator = ({ req, res, descriptor, httpPath }) => {
-  return new ActionContextImpl(req, res, descriptor, httpPath)
+export const createDefaultActionContext: ActionContextCreator = ({ router, req, res, descriptor, httpPath }) => {
+  return new ActionContextImpl(router, req, res, descriptor, httpPath)
 }
 
 export class ActionContextImpl implements MutableActionContext {
@@ -346,6 +347,7 @@ export class ActionContextImpl implements MutableActionContext {
   private _input: any
 
   constructor(
+    private router: Router,
     readonly req: express.Request,
     readonly res: express.Response,
     readonly descriptor: ActionDescriptor,
@@ -374,6 +376,10 @@ export class ActionContextImpl implements MutableActionContext {
   }
   get httpFilePath() {
     return `${this.httpPath}/${this.descriptor.action}`
+  }
+
+  resourceOf(name: string) {
+    return this.router.resourceOf(name)
   }
 
   willRespondJson() {
@@ -419,12 +425,13 @@ export abstract class BasicRouter implements Router {
     readonly fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     readonly httpPath: string = '/',
-    protected readonly routerCore: RouterCore = { handlerBuildRunners: [] }
+    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
   ) {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
 
   abstract sub(...args: any[]): Router
+  abstract resourceOf(name: string): Resource
   protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
@@ -458,7 +465,7 @@ export abstract class BasicRouter implements Router {
   }
 }
 
-const createResourceProxy = (config: RouteConfig, resource: Resource): Resource => {
+const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Resource => {
   const resourceProxy: Resource = {}
   for (const actionName in resource) {
     const resourceMethod = resource[actionName]
@@ -484,13 +491,12 @@ const createResourceProxy = (config: RouteConfig, resource: Resource): Resource 
 
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
-  readonly nameToResource: Map<string, Resource> = new Map<string, Resource>()
 
   constructor(
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath = '/',
-    readonly routerCore: RouterCore = { handlerBuildRunners: [] }
+    readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
   ) {
     super(fileRoot, serverRouterConfig, httpPath, routerCore)
     this.router = express.Router({ mergeParams: true })
@@ -508,8 +514,16 @@ export class ServerRouter extends BasicRouter {
     return subRouter
   }
 
+  get nameToResource() {
+    return this.routerCore.nameToResource
+  }
+
   resourceOf(name: string) {
-    return this.nameToResource.get(name)
+    const resource = this.routerCore.nameToResource.get(name)
+    if (resource === undefined) {
+      throw Error(`Resource not found: ${name}`)
+    }
+    return resource
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
@@ -543,10 +557,11 @@ export class ServerRouter extends BasicRouter {
       )
 
       const resourceName = routeConfig.name
-      if (this.nameToResource.get(resourceName)) {
+      if (this.routerCore.nameToResource.get(resourceName)) {
         throw new Error(`Duplicated Resource Name: ${resourceName}`)
       }
-      this.nameToResource.set(resourceName, createResourceProxy(routeConfig, resource))
+      console.log('setresource', resourceName)
+      this.routerCore.nameToResource.set(resourceName, createLocalResourceProxy(routeConfig, resource))
 
       const adapterPath = this.getAdapterPath(rpath)
       const adapter: MultiOptionAdapter = await importAndSetup<ActionSupport, MultiOptionAdapter>(
@@ -595,6 +610,7 @@ export class ServerRouter extends BasicRouter {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
           const handler: express.Handler = async (req, res, next) => {
             const ctx = this.serverRouterConfig.createActionContext({
+              router: this,
               req,
               res,
               descriptor: actionDescriptor,
@@ -617,6 +633,7 @@ export class ServerRouter extends BasicRouter {
 
             const handler: express.Handler = async (req, res, next) => {
               const ctx = this.serverRouterConfig.createActionContext({
+                router: this,
                 req,
                 res,
                 descriptor: actionDescriptor,
@@ -703,6 +720,10 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     )
   }
 
+  resourceOf(name: string): Resource {
+    throw new Error('Unimplemented')
+  }
+
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
     return async () => {
       const resourcePath = this.getResourcePath(rpath)
@@ -714,7 +735,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
         config
       )
 
-      const resourceProxy = createResourceProxy(config, resource)
+      const resourceProxy = createLocalResourceProxy(config, resource)
       this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
     }
   }

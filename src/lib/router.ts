@@ -1,7 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { ServerRouter } from './server-router'
-import { ValidationError } from '../client'
+import { ValidationError, Resource, ResourceMethod } from '../client'
 
 export { z }
 
@@ -32,8 +32,9 @@ export type RouteConfig = {
 }
 
 export interface Router {
-  sub(...args: any[]): Router
+  sub(...args: unknown[]): Router
   resources(path: string, config: RouteConfig): void
+  resourceOf(name: string): Resource
 }
 
 export namespace Actions {
@@ -147,6 +148,7 @@ export type ActionContext = {
   readonly httpFilePath: string
   readonly descriptor: ActionDescriptor
   readonly willRespondJson: () => boolean
+  resourceOf(name: string): Resource
 }
 
 export type MutableActionContext = ActionContext & {
@@ -154,6 +156,7 @@ export type MutableActionContext = ActionContext & {
 }
 
 export type ActionContextProps = {
+  router: Router
   req: express.Request
   res: express.Response
   descriptor: ActionDescriptor
@@ -206,6 +209,7 @@ export type Renderer = (ctx: ActionContext, options?: unknown) => false | undefi
 
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
+  nameToResource: Map<string, Resource>
 }
 
 export type ResourceMethodHandlerParams = {
@@ -258,9 +262,6 @@ export function defineMultiOptionAdapter(
 export function defineAdapter<AR>(callback: (support: ActionSupport, config: RouteConfig) => AR) {
   return callback
 }
-
-export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
-export type Resource = Record<string, ResourceMethod>
 
 export type EndpointFunc<S, R> = (support: S, config: RouteConfig) => R
 export type ResourceFunc = EndpointFunc<ResourceSupport, Resource>
