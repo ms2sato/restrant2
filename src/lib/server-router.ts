@@ -29,8 +29,11 @@ import {
   ResourceMethodHandlerParams,
   RouterCore,
   HandlerBuildRunner,
+  Resource,
+  EndpointFunc,
 } from '../index'
-import { MutableActionContext } from './router'
+import { MutableActionContext, ResourceMethod } from './router'
+import { isImportError } from './type-util'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -216,10 +219,10 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
         if (responder && 'fatal' in responder) {
           try {
             handlerLog('%s#%s.fatal', adapterPath, actionName)
-            await responder.fatal!.apply(adapter, [ctx, err as Error, ...options])
+            await responder.fatal?.apply(adapter, [ctx, err, ...options])
           } catch (er) {
             console.log('Unexpected Error on responder.fatal, dispatch to default responder', er)
-            defaultResponder.fatal(ctx, err)
+            await defaultResponder.fatal(ctx, err)
           }
         } else {
           return next(err)
@@ -232,12 +235,12 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 
         try {
           if (responder && 'beforeValidation' in responder) {
-            source = await responder.beforeValidation!(ctx, source, schema)
+            source = await responder.beforeValidation?.(ctx, source, schema)
           }
 
           let input = schema.parse(source)
           if (responder && 'afterValidation' in responder) {
-            input = await responder.afterValidation!(ctx, input, schema)
+            input = (await responder.afterValidation?.(ctx, input, schema)) as { [x: string]: any }
           }
 
           handlerLog('input', input)
@@ -247,7 +250,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 
           if (responder && 'success' in responder) {
             handlerLog('%s#%s.success', adapterPath, actionName)
-            const ret = await responder.success!.apply(adapter, [ctx, output, ...options])
+            const ret = await responder.success?.apply(adapter, [ctx, output, ...options])
             if (ret === false) {
               handlerLog(' dispatch to default responder')
               defaultResponder.success(ctx, output)
@@ -301,37 +304,34 @@ export function renderDefault(ctx: ActionContext, options: any = undefined) {
   ctx.render(ctx.httpFilePath.replace(/^\//, ''), options)
 }
 
-export const importAndSetup = async (
+export const importAndSetup = async <S, R>(
   fileRoot: string,
   modulePath: string,
-  support: ResourceSupport | ActionSupport,
+  support: S,
   config: RouteConfig
-) => {
-  let ret
+): Promise<R> => {
+  let ret: { default: EndpointFunc<S, R> }
   const fullPath = path.join(fileRoot, modulePath)
   try {
-    ret = await import(fullPath)
+    ret = (await import(fullPath)) as { default: EndpointFunc<S, R> }
   } catch (err) {
-    const error = err as any
-    if (error.code === 'MODULE_NOT_FOUND') {
+    if (isImportError(err) && err.code === 'MODULE_NOT_FOUND') {
       routeLog.extend('debug')('%s not found', fullPath)
-      return {}
+      return {} as R
     } else {
       throw err
     }
   }
 
   try {
-    return await ret.default(support, config)
+    return ret.default(support, config)
   } catch (err) {
     if (err instanceof Error) {
-      // for Error 2nd argument type
-      // @ts-ignore
       throw new RouterError(`Error occured "${err.message}" on calling default function in "${modulePath}"`, {
         cause: err,
       })
     } else {
-      throw new TypeError(`Unexpected Error Object: ${err}`)
+      throw new TypeError(`Unexpected Error Object: ${err as string}`)
     }
   }
 }
@@ -458,8 +458,33 @@ export abstract class BasicRouter implements Router {
   }
 }
 
+const createResourceProxy = (config: RouteConfig, resource: Resource): Resource => {
+  const resourceProxy: Resource = {}
+  for (const actionName in resource) {
+    const resourceMethod = resource[actionName]
+    const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
+    if (cad?.schema) {
+      const schema = cad.schema
+      resourceProxy[actionName] = function (input, ...options) {
+        const parsedInput = schema.parse(input)
+        if (parsedInput === undefined) {
+          throw new Error('UnexpectedInput')
+        }
+        return resourceMethod.apply(resource, [parsedInput, ...options])
+      }
+    } else {
+      resourceProxy[actionName] = function (...args) {
+        return resourceMethod.apply(resource, args)
+      }
+    }
+  }
+
+  return resourceProxy
+}
+
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
+  readonly nameToResource: Map<string, Resource> = new Map<string, Resource>()
 
   constructor(
     fileRoot: string,
@@ -471,16 +496,20 @@ export class ServerRouter extends BasicRouter {
     this.router = express.Router({ mergeParams: true })
   }
 
-  sub(...args: any[]) {
+  sub(rpath: string, ...args: unknown[]) {
     // TODO: impl class SubServerRouter without build
     const subRouter = new ServerRouter(
       this.fileRoot,
       this.serverRouterConfig,
-      path.join(this.httpPath, args[0]),
+      path.join(this.httpPath, rpath),
       this.routerCore
     )
-    ;(this.router as any).use.apply(this.router, [...args, subRouter.router])
+    ;(this.router as any).use.apply(this.router, [rpath, ...args, subRouter.router])
     return subRouter
+  }
+
+  resourceOf(name: string) {
+    return this.nameToResource.get(name)
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
@@ -506,15 +535,21 @@ export class ServerRouter extends BasicRouter {
       handlerLog('buildHandler: %s', path.join(this.httpPath, rpath))
 
       const resourcePath = this.getResourcePath(rpath)
-      const resource = await importAndSetup(
+      const resource = await importAndSetup<ResourceSupport, Resource>(
         this.fileRoot,
         resourcePath,
         new ResourceSupport(this.fileRoot, this.serverRouterConfig),
         routeConfig
       )
 
+      const resourceName = routeConfig.name
+      if (this.nameToResource.get(resourceName)) {
+        throw new Error(`Duplicated Resource Name: ${resourceName}`)
+      }
+      this.nameToResource.set(resourceName, createResourceProxy(routeConfig, resource))
+
       const adapterPath = this.getAdapterPath(rpath)
-      const adapter: MultiOptionAdapter = await importAndSetup(
+      const adapter: MultiOptionAdapter = await importAndSetup<ActionSupport, MultiOptionAdapter>(
         this.fileRoot,
         adapterPath,
         new ActionSupport(this.fileRoot, this.serverRouterConfig),
@@ -527,7 +562,7 @@ export class ServerRouter extends BasicRouter {
         const actionName = actionDescriptor.action
         const resourceHttpPath = this.getHttpPath(rpath)
 
-        const resourceMethod: Function | undefined = resource[actionName]
+        const resourceMethod: ResourceMethod | undefined = resource[actionName]
         const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
         const constructDescriptor: ConstructDescriptor | undefined = routeConfig.construct?.[actionName]
 
@@ -540,7 +575,7 @@ export class ServerRouter extends BasicRouter {
           }
         }
 
-        if (actionOverride && resourceMethod) {
+        if (actionOverride && resourceMethod !== undefined) {
           routeLog.extend('warn')(
             `${resourcePath}#${actionName} is defined but will not be called auto. Responder support auto call; proposal: 'Remove ${resourcePath}#${actionName}' or 'Change to Responder(not Function) ${adapterPath}/#${actionName}' or 'Remove ${adapterPath}/#${actionName}'`
           )
@@ -548,9 +583,10 @@ export class ServerRouter extends BasicRouter {
 
         const defaultConstructDescriptor: ConstructDescriptor | undefined =
           this.serverRouterConfig.constructConfig[actionName]
-        const schema: z.AnyZodObject | undefined = resourceMethod
-          ? choiceSchema(constructDescriptor, defaultConstructDescriptor, actionName, resourcePath)
-          : undefined
+        const schema: z.AnyZodObject | undefined =
+          resourceMethod === undefined
+            ? undefined
+            : choiceSchema(constructDescriptor, defaultConstructDescriptor, actionName, resourcePath)
 
         const defaultSources = defaultConstructDescriptor?.sources || ['params']
 
@@ -650,20 +686,20 @@ export class ServerRouter extends BasicRouter {
 
 export class ResourceHolderCreateRouter extends BasicRouter {
   constructor(
-    private resourcesHolder: any,
+    private resourcesHolder: Record<string, Resource>,
     fileRoot: string,
     routerOption: Partial<ServerRouterConfig> = {},
-    httpPath: string = '/'
+    httpPath = '/'
   ) {
     super(fileRoot, routerOption, httpPath)
   }
 
-  sub(...args: any[]) {
+  sub(rpath: string) {
     return new ResourceHolderCreateRouter(
       this.resourcesHolder,
       this.fileRoot,
       this.serverRouterConfig,
-      path.join(this.httpPath, args[0])
+      path.join(this.httpPath, rpath)
     )
   }
 
@@ -671,25 +707,15 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     return async () => {
       const resourcePath = this.getResourcePath(rpath)
       const resourceSupport = new ResourceSupport(this.fileRoot, this.serverRouterConfig)
-      const resource = await importAndSetup(this.fileRoot, resourcePath, resourceSupport, config)
+      const resource = await importAndSetup<ResourceSupport, Resource>(
+        this.fileRoot,
+        resourcePath,
+        resourceSupport,
+        config
+      )
 
-      const resourceProxy: Record<string, Function> = {}
-      for (let actionName in resource) {
-        const resourceMethod = resource[actionName]
-        const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
-        if (cad?.schema) {
-          resourceProxy[actionName] = function () {
-            const [input, ...options] = Array.from(arguments)
-            return resourceMethod.apply(resource, cad.schema?.parse(input), options)
-          }
-        } else {
-          resourceProxy[actionName] = function () {
-            return resourceMethod.apply(resource, arguments)
-          }
-        }
-
-        this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
-      }
+      const resourceProxy = createResourceProxy(config, resource)
+      this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
     }
   }
 }

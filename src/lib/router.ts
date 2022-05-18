@@ -165,27 +165,27 @@ export type ActionContextCreator = (props: ActionContextProps) => MutableActionC
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
-  success?: (ctx: ActionContext, output: any, ...options: any) => any | Promise<any>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: any, ...options: any) => void | Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, ...options: any) => void | Promise<void>
+  success?: (ctx: ActionContext, output: unknown, ...options: unknown[]) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: unknown, ...options: unknown[]) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, ...options: unknown[]) => void | Promise<void>
 }
 
-export type Responder<Opt = undefined, Out = any, Src = any> = {
-  success?: (ctx: ActionContext, output: Out, option?: Opt) => any | Promise<any>
+export type Responder<Opt = undefined, Out = unknown, Src = unknown> = {
+  success?: (ctx: ActionContext, output: Out, option?: Opt) => unknown | Promise<unknown>
   invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option?: Opt) => void | Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option?: Opt) => void | Promise<void>
 }
 
-export type RequestCallback<In = any> = {
-  beforeValidation?: (ctx: ActionContext, source: any, schema: z.AnyZodObject) => any
-  afterValidation?: (ctx: ActionContext, input: In, schema: z.AnyZodObject) => any
+export type RequestCallback<In = unknown> = {
+  beforeValidation?: (ctx: ActionContext, source: unknown, schema: z.AnyZodObject) => unknown
+  afterValidation?: (ctx: ActionContext, input: In, schema: z.AnyZodObject) => unknown
 }
 
 export type MultiOptionAdapter = {
   [key: string]: Handler | MultiOptionResponder | RequestCallback
 }
 
-export type Adapter<Opt = undefined, In = any> = {
+export type Adapter<Opt = undefined, In = unknown> = {
   [key: string]: Handler | Responder<Opt> | RequestCallback<In>
 }
 
@@ -195,22 +195,22 @@ export type CreateActionOptionsFunction = (
   ctx: ActionContext,
   httpPath: string,
   ad: ActionDescriptor
-) => any[] | Promise<any[]>
+) => unknown[] | Promise<unknown[]>
 
 export type HandlerBuildRunner = () => Promise<void>
 
 /**
  * @returns If not rendered return false.
  */
-export type Renderer = (ctx: ActionContext, options?: any) => false | undefined
+export type Renderer = (ctx: ActionContext, options?: unknown) => false | undefined
 
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
 }
 
 export type ResourceMethodHandlerParams = {
-  resourceMethod: Function
-  resource: any
+  resourceMethod: ResourceMethod
+  resource: Resource
   sources: readonly ConstructSource[]
   router: ServerRouter
   httpPath: string
@@ -235,11 +235,7 @@ export type ServerRouterConfig = {
   resourceFileName: string
 }
 
-export type InputArranger = (
-  ctx: MutableActionContext,
-  sources: readonly string[],
-  schema: z.AnyZodObject
-) => Record<string, any>
+export type InputArranger = (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) => unknown
 
 export class ActionSupport {
   constructor(readonly rootPath: string, readonly serverRouterConfig: ServerRouterConfig) {}
@@ -249,9 +245,7 @@ export class ResourceSupport {
   constructor(readonly rootPath: string, readonly serverRouterConfig: ServerRouterConfig) {}
 }
 
-export function defineResource<R extends Record<string, Function>>(
-  callback: (support: ResourceSupport, config: RouteConfig) => R
-) {
+export function defineResource<R extends Resource>(callback: (support: ResourceSupport, config: RouteConfig) => R) {
   return callback
 }
 
@@ -265,7 +259,12 @@ export function defineAdapter<AR>(callback: (support: ActionSupport, config: Rou
   return callback
 }
 
-type ResourceFunc = (support: ResourceSupport, config: RouteConfig) => Record<string, (...args: any) => any>
+export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
+export type Resource = Record<string, ResourceMethod>
+
+export type EndpointFunc<S, R> = (support: S, config: RouteConfig) => R
+export type ResourceFunc = EndpointFunc<ResourceSupport, Resource>
+export type ActionFunc = EndpointFunc<ActionSupport, MultiOptionAdapter>
 
 export type AdapterOf<R extends ResourceFunc, Opt = undefined> = {
   [key in keyof ReturnType<R>]:

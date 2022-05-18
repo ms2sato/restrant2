@@ -76,7 +76,7 @@ function traverseSchema(schema: z.AnyZodObject, obj: any, callback: TraverseCall
   return obj
 }
 
-export function fillDefault(schema: z.AnyZodObject, obj: any): any {
+export function fillDefault(schema: z.AnyZodObject, obj: unknown): unknown {
   return traverseSchema(schema, obj, (schema, obj, key) => {
     if (schema instanceof z.ZodDefault) {
       obj[key] = (schema._def as any).defaultValue()
