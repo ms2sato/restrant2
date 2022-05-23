@@ -18,10 +18,7 @@ function callSetup(
   // eslint-disable-next-line @typescript-eslint/ban-types
 ): Record<string, Function> {
   const setup = re.default
-  const support: ResourceSupport = {
-    rootPath,
-    serverRouterConfig,
-  }
+  const support = new ResourceSupport(rootPath)
   const routeConfig: RouteConfig = { name }
   return setup(support, routeConfig)
 }

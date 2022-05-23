@@ -45,7 +45,7 @@ export class NullActionContext implements ActionContext {
   willRespondJson(): boolean {
     throw new Error(this.errorMessage)
   }
-  resourceOf(name: string): Resource {
+  resourceOf<R extends Resource>(name: string): R {
     throw new Error(this.errorMessage)
   }
 }

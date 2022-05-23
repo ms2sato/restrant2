@@ -2,10 +2,8 @@ import express from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
-import { ValidationError, ResourceMethod } from '../client'
 import {
   ActionContext,
-  ActionContextCreator,
   ActionDescriptor,
   Actions,
   ActionSupport,
@@ -13,13 +11,14 @@ import {
   ConstructDescriptor,
   CreateActionOptionsFunction,
   Handler,
+  InputArranger,
+  Renderer,
   MultiOptionAdapter,
   MultiOptionResponder,
   ResourceSupport,
   RouteConfig,
   Router,
   RouterError,
-  ServerRouterConfig,
   RequestCallback,
   parseFormBody,
   createZodTraverseArrangerCreator,
@@ -27,10 +26,13 @@ import {
   deepCast,
   Responder,
   ResourceMethodHandlerParams,
-  RouterCore,
   HandlerBuildRunner,
   Resource,
   EndpointFunc,
+  ValidationError,
+  ResourceMethod,
+  idNumberSchema,
+  blankSchema,
 } from '../index'
 import { MutableActionContext } from './router'
 import { isImportError } from './type-util'
@@ -39,30 +41,29 @@ const log = debug('restrant2')
 const routeLog = log.extend('route')
 const handlerLog = log.extend('handler')
 
-export const blankSchema = z.object({})
-export type BlankParams = z.infer<typeof blankSchema>
+export type ActionContextProps = {
+  router: ServerRouter
+  req: express.Request
+  res: express.Response
+  descriptor: ActionDescriptor
+  httpPath: string
+}
 
-export const idNumberSchema = z.object({
-  id: z.number(),
-})
+export type ActionContextCreator = (props: ActionContextProps) => MutableActionContext
 
-export type IdNumberParams = z.infer<typeof idNumberSchema>
-
-export type PrimaryKeyParams<T, N extends string = 'id'> = { [P in N]: T }
-
-// for express-fileupload
-export const uploadedFileSchema = z.object({
-  name: z.string(),
-  mv: z.function().args(z.string()).returns(z.promise(z.void())),
-  mimetype: z.string(),
-  data: z.any(),
-  tempFilePath: z.string(),
-  truncated: z.boolean(),
-  size: z.number(),
-  md5: z.string(),
-})
-
-export type UploadedFile = z.infer<typeof uploadedFileSchema>
+export type ServerRouterConfig = {
+  actions: readonly ActionDescriptor[]
+  inputArranger: InputArranger
+  createActionOptions: CreateActionOptionsFunction
+  createActionContext: ActionContextCreator
+  constructConfig: ConstructConfig
+  createDefaultResponder: (params: ResourceMethodHandlerParams) => Required<Responder>
+  renderDefault: Renderer
+  adapterRoot: string
+  adapterFileName: string
+  resourceRoot: string
+  resourceFileName: string
+}
 
 function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
   return {
@@ -347,7 +348,7 @@ export class ActionContextImpl implements MutableActionContext {
   private _input: any
 
   constructor(
-    private router: Router,
+    private router: ServerRouter,
     readonly req: express.Request,
     readonly res: express.Response,
     readonly descriptor: ActionDescriptor,
@@ -378,8 +379,8 @@ export class ActionContextImpl implements MutableActionContext {
     return `${this.httpPath}/${this.descriptor.action}`
   }
 
-  resourceOf(name: string) {
-    return this.router.resourceOf(name)
+  resourceOf<R extends Resource>(name: string) {
+    return this.router.resourceOf<R>(name)
   }
 
   willRespondJson() {
@@ -418,6 +419,11 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
   }
 }
 
+export type RouterCore = {
+  handlerBuildRunners: HandlerBuildRunner[]
+  nameToResource: Map<string, Resource>
+}
+
 export abstract class BasicRouter implements Router {
   readonly serverRouterConfig: ServerRouterConfig
 
@@ -431,7 +437,7 @@ export abstract class BasicRouter implements Router {
   }
 
   abstract sub(...args: any[]): Router
-  abstract resourceOf(name: string): Resource
+  abstract resourceOf<R extends Resource>(name: string): R
   protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
@@ -518,12 +524,12 @@ export class ServerRouter extends BasicRouter {
     return this.routerCore.nameToResource
   }
 
-  resourceOf(name: string) {
+  resourceOf<R extends Resource = Resource>(name: string): R {
     const resource = this.routerCore.nameToResource.get(name)
     if (resource === undefined) {
       throw Error(`Resource not found: ${name}`)
     }
-    return resource
+    return resource as R
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
@@ -552,7 +558,7 @@ export class ServerRouter extends BasicRouter {
       const resource = await importAndSetup<ResourceSupport, Resource>(
         this.fileRoot,
         resourcePath,
-        new ResourceSupport(this.fileRoot, this.serverRouterConfig),
+        new ResourceSupport(this.fileRoot),
         routeConfig
       )
 
@@ -567,7 +573,7 @@ export class ServerRouter extends BasicRouter {
       const adapter: MultiOptionAdapter = await importAndSetup<ActionSupport, MultiOptionAdapter>(
         this.fileRoot,
         adapterPath,
-        new ActionSupport(this.fileRoot, this.serverRouterConfig),
+        new ActionSupport(this.fileRoot),
         routeConfig
       )
 
@@ -720,14 +726,14 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     )
   }
 
-  resourceOf(name: string): Resource {
+  resourceOf<R extends Resource>(name: string): R {
     throw new Error('Unimplemented')
   }
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
     return async () => {
       const resourcePath = this.getResourcePath(rpath)
-      const resourceSupport = new ResourceSupport(this.fileRoot, this.serverRouterConfig)
+      const resourceSupport = new ResourceSupport(this.fileRoot)
       const resource = await importAndSetup<ResourceSupport, Resource>(
         this.fileRoot,
         resourcePath,

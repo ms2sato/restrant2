@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
-export type Resource = Record<string, ResourceMethod>
+export { z }
 
-export type ValidationError = z.ZodError
+export * from './lib/shared'
+export * from './lib/schemas'
+export * as Actions from './lib/actions'
