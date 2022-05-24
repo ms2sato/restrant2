@@ -1,18 +1,16 @@
-import { ResourceSupport, RouteConfig, defaultServerRouterConfig, ServerRouterConfig } from 'restrant2'
+import { ResourceSupport, RouteConfig } from 'restrant2'
 import * as re from './resource'
 import { TaskCreateParams, TaskUpdateParams } from '../../params'
 import { TaskStore } from '../../models/TaskStore'
 
 type CallSetupParams = {
   rootPath: string
-  serverRouterConfig: ServerRouterConfig
   name: string
 }
 
 function callSetup(
-  { rootPath, serverRouterConfig, name }: CallSetupParams = {
+  { rootPath, name }: CallSetupParams = {
     rootPath: './',
-    serverRouterConfig: defaultServerRouterConfig(),
     name: `${Math.random()}`,
   }
   // eslint-disable-next-line @typescript-eslint/ban-types
