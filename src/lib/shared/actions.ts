@@ -1,4 +1,4 @@
-import { ActionDescriptor, RouterError } from '../client'
+import { ActionDescriptor, RouterError } from '../../client'
 
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 

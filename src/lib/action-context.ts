@@ -1,6 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { ValidationError, Resource, ActionDescriptor, RouteConfig } from '../index'
+import { ValidationError, Resource, ActionDescriptor, RouteConfig } from '..'
 
 export { z }
 
@@ -73,26 +73,8 @@ export class ResourceSupport {
   constructor(readonly rootPath: string) {}
 }
 
-export function defineResource<R extends Resource>(callback: (support: ResourceSupport, config: RouteConfig) => R) {
-  return callback
-}
-
-export function defineMultiOptionAdapter(
-  callback: (support: ActionSupport, config: RouteConfig) => MultiOptionAdapter
-) {
-  return callback
-}
-
-export function defineAdapter<AR>(callback: (support: ActionSupport, config: RouteConfig) => AR) {
-  return callback
-}
-
 export type EndpointFunc<S, R> = (support: S, config: RouteConfig) => R
 export type ResourceFunc = EndpointFunc<ResourceSupport, Resource>
 export type ActionFunc = EndpointFunc<ActionSupport, MultiOptionAdapter>
 
-export type AdapterOf<R extends ResourceFunc, Opt = undefined> = {
-  [key in keyof ReturnType<R>]:
-    | Responder<Opt, Awaited<ReturnType<ReturnType<R>[key]>>, Partial<Parameters<ReturnType<R>[key]>[0]>>
-    | RequestCallback<Parameters<ReturnType<R>[key]>[0]>
-}
+

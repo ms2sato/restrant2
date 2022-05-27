@@ -33,9 +33,9 @@ import {
   ResourceMethod,
   idNumberSchema,
   blankSchema,
-} from '../index'
-import { MutableActionContext } from './router'
-import { isImportError } from './type-util'
+  MutableActionContext,
+  isImportError
+} from '..'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -450,7 +450,6 @@ export abstract class BasicRouter implements Router {
   }
 
   abstract sub(...args: any[]): Router
-  abstract resourceOf<R extends Resource>(name: string): R
   protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
@@ -737,10 +736,6 @@ export class ResourceHolderCreateRouter extends BasicRouter {
       this.serverRouterConfig,
       path.join(this.httpPath, rpath)
     )
-  }
-
-  resourceOf<R extends Resource>(name: string): R {
-    throw new Error('Unimplemented')
   }
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
