@@ -33,7 +33,6 @@ export type RouteConfig = {
 export interface Router {
   sub(...args: unknown[]): Router
   resources(path: string, config: RouteConfig): void
-  resourceOf<R extends Resource>(name: string): R
 }
 
 export class RouterError extends Error {}

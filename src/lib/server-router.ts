@@ -9,6 +9,7 @@ import {
   ActionSupport,
   ConstructConfig,
   ConstructDescriptor,
+  ConstructSource,
   CreateActionOptionsFunction,
   Handler,
   InputArranger,
@@ -25,7 +26,6 @@ import {
   fillDefault,
   deepCast,
   Responder,
-  ResourceMethodHandlerParams,
   HandlerBuildRunner,
   Resource,
   EndpointFunc,
@@ -50,6 +50,19 @@ export type ActionContextProps = {
 }
 
 export type ActionContextCreator = (props: ActionContextProps) => MutableActionContext
+
+export type ResourceMethodHandlerParams = {
+  resourceMethod: ResourceMethod
+  resource: Resource
+  sources: readonly ConstructSource[]
+  router: ServerRouter
+  httpPath: string
+  schema: z.AnyZodObject
+  adapterPath: string
+  actionDescriptor: ActionDescriptor
+  responder: MultiOptionResponder | RequestCallback
+  adapter: MultiOptionAdapter
+}
 
 export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
@@ -212,8 +225,8 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   const defaultResponder = serverRouterConfig.createDefaultResponder(params)
   const actionName = actionDescriptor.action
 
-  return async (req, res, next) => {
-    try {
+  return (req, res, next) => {
+    ;(async () => {
       const ctx = serverRouterConfig.createActionContext({ router, req, res, descriptor: actionDescriptor, httpPath })
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
@@ -288,9 +301,9 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
       } catch (err) {
         return handleFatal(err as Error)
       }
-    } catch (err) {
+    })().catch((err) => {
       next(err)
-    }
+    })
   }
 }
 

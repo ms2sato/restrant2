@@ -1,6 +1,5 @@
 import express from 'express'
-import { Resource } from '../client'
-import { ActionContext, ActionDescriptor } from './router'
+import { Resource, ActionContext, ActionDescriptor } from '../index'
 
 export class NullActionContext implements ActionContext {
   private errorMessage = 'Cannot access this ActionContext(May not request context)'
@@ -45,7 +44,7 @@ export class NullActionContext implements ActionContext {
   willRespondJson(): boolean {
     throw new Error(this.errorMessage)
   }
-  resourceOf<R extends Resource>(name: string): R {
+  resourceOf<R extends Resource>(_name: string): R {
     throw new Error(this.errorMessage)
   }
 }

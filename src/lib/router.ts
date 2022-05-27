@@ -1,16 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { ServerRouter } from './server-router'
-import {
-  ValidationError,
-  Resource,
-  ResourceMethod,
-  ActionDescriptor,
-  RouteConfig,
-  ConstructSource,
-} from '../client'
-
-export * from '../client'
+import { ValidationError, Resource, ActionDescriptor, RouteConfig } from '../index'
 
 export { z }
 
@@ -72,19 +62,6 @@ export type CreateActionOptionsFunction = (
  * @returns If not rendered return false.
  */
 export type Renderer = (ctx: ActionContext, options?: unknown) => false | undefined
-
-export type ResourceMethodHandlerParams = {
-  resourceMethod: ResourceMethod
-  resource: Resource
-  sources: readonly ConstructSource[]
-  router: ServerRouter
-  httpPath: string
-  schema: z.AnyZodObject
-  adapterPath: string
-  actionDescriptor: ActionDescriptor
-  responder: MultiOptionResponder | RequestCallback
-  adapter: MultiOptionAdapter
-}
 
 export type InputArranger = (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) => unknown
 
