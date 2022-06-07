@@ -34,7 +34,8 @@ import {
   idNumberSchema,
   blankSchema,
   MutableActionContext,
-  isImportError
+  isImportError,
+  NamedResources
 } from '..'
 
 const log = debug('restrant2')
@@ -392,8 +393,8 @@ export class ActionContextImpl implements MutableActionContext {
     return `${this.httpPath}/${this.descriptor.action}`
   }
 
-  resourceOf<R extends Resource>(name: string) {
-    return this.router.resourceOf<R>(name)
+  resources(): NamedResources {
+    return this.router.namedResources()
   }
 
   willRespondJson() {
@@ -532,16 +533,8 @@ export class ServerRouter extends BasicRouter {
     return subRouter
   }
 
-  get nameToResource() {
-    return this.routerCore.nameToResource
-  }
-
-  resourceOf<R extends Resource = Resource>(name: string): R {
-    const resource = this.routerCore.nameToResource.get(name)
-    if (resource === undefined) {
-      throw Error(`Resource not found: ${name}`)
-    }
-    return resource as R
+  namedResources(): NamedResources {
+    return Object.fromEntries(this.routerCore.nameToResource)
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
@@ -578,7 +571,6 @@ export class ServerRouter extends BasicRouter {
       if (this.routerCore.nameToResource.get(resourceName)) {
         throw new Error(`Duplicated Resource Name: ${resourceName}`)
       }
-      console.log('setresource', resourceName)
       this.routerCore.nameToResource.set(resourceName, createLocalResourceProxy(routeConfig, resource))
 
       const adapterPath = this.getAdapterPath(rpath)

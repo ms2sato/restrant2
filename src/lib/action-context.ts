@@ -1,6 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { ValidationError, Resource, ActionDescriptor, RouteConfig } from '..'
+import { ValidationError, Resource, ActionDescriptor, RouteConfig, NamedResources } from '..'
 
 export { z }
 
@@ -18,7 +18,7 @@ export type ActionContext = {
   readonly httpFilePath: string
   readonly descriptor: ActionDescriptor
   readonly willRespondJson: () => boolean
-  resourceOf<R extends Resource>(name: string): R
+  resources: () => NamedResources
 }
 
 export type MutableActionContext = ActionContext & {
@@ -76,5 +76,3 @@ export class ResourceSupport {
 export type EndpointFunc<S, R> = (support: S, config: RouteConfig) => R
 export type ResourceFunc = EndpointFunc<ResourceSupport, Resource>
 export type ActionFunc = EndpointFunc<ActionSupport, MultiOptionAdapter>
-
-
