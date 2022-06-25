@@ -23,19 +23,18 @@ import {
   RequestCallback,
   parseFormBody,
   createZodTraverseArrangerCreator,
-  fillDefault,
-  deepCast,
+  SchemaUtil,
   Responder,
   HandlerBuildRunner,
   Resource,
   EndpointFunc,
   ValidationError,
   ResourceMethod,
-  idNumberSchema,
-  blankSchema,
   MutableActionContext,
   isImportError,
-  NamedResources
+  NamedResources,
+  choiceSchema,
+  choiseSources,
 } from '..'
 
 const log = debug('restrant2')
@@ -79,25 +78,13 @@ export type ServerRouterConfig = {
   resourceFileName: string
 }
 
-function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
-  return {
-    build: { schema: blankSchema, sources: ['params'] },
-    edit: { schema: idSchema, sources: ['params'] },
-    show: { schema: idSchema, sources: ['params'] },
-    index: { schema: blankSchema, sources: ['params'] },
-    create: { sources: ['body', 'files', 'params'] },
-    update: { sources: ['body', 'files', 'params'] },
-    destroy: { schema: idSchema, sources: ['params'] },
-  }
-}
-
 export function arrangeFormInput(ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) {
   return parseFormBody(ctx.mergeInputs(sources), createZodTraverseArrangerCreator(schema))
 }
 
 export function arrangeJsonInput(ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) {
   const pred = (input: any, source: string) => {
-    return source === 'body' ? input : deepCast(schema, input)
+    return source === 'body' ? input : SchemaUtil.deepCast(schema, input)
   }
   return ctx.mergeInputs(sources, pred)
 }
@@ -284,7 +271,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
             handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
             if (responder) {
               if ('invalid' in responder) {
-                const filledSource = fillDefault(schema, source)
+                const filledSource = SchemaUtil.fillDefault(schema, source)
                 handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
                 res.status(422)
                 await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
@@ -423,7 +410,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
     inputArranger: createSmartInputArranger(),
     createActionOptions: createNullActionOptions,
     createActionContext: createDefaultActionContext,
-    constructConfig: defaultConstructConfig(),
+    constructConfig: Actions.defaultConstructConfig(),
     createDefaultResponder: createSmartResponder,
     renderDefault: renderDefault,
     adapterRoot: './endpoint',
@@ -538,24 +525,6 @@ export class ServerRouter extends BasicRouter {
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
-    const choiceSchema = (
-      constructDescriptor: ConstructDescriptor | undefined,
-      defaultConstructDescriptor: ConstructDescriptor,
-      actionName: string,
-      resourcePath: string
-    ) => {
-      if (constructDescriptor?.schema === undefined) {
-        if (!defaultConstructDescriptor?.schema) {
-          throw new Error(`construct.${actionName}.schema not found in routes for ${resourcePath}#${actionName}`)
-        }
-        return defaultConstructDescriptor.schema
-      } else if (constructDescriptor.schema === null) {
-        return blankSchema
-      } else {
-        return constructDescriptor.schema
-      }
-    }
-
     return async () => {
       handlerLog('buildHandler: %s', path.join(this.httpPath, rpath))
 
@@ -606,14 +575,10 @@ export class ServerRouter extends BasicRouter {
           )
         }
 
-        const defaultConstructDescriptor: ConstructDescriptor | undefined =
-          this.serverRouterConfig.constructConfig[actionName]
         const schema: z.AnyZodObject | undefined =
           resourceMethod === undefined
             ? undefined
-            : choiceSchema(constructDescriptor, defaultConstructDescriptor, actionName, resourcePath)
-
-        const defaultSources = defaultConstructDescriptor?.sources || ['params']
+            : choiceSchema(this.serverRouterConfig.constructConfig, constructDescriptor, actionName)
 
         let params
         if (actionOverride) {
@@ -663,7 +628,7 @@ export class ServerRouter extends BasicRouter {
               throw new Error('Unreachable: schema is undefined')
             }
 
-            const sources = constructDescriptor?.sources || defaultSources
+            const sources = choiseSources(this.serverRouterConfig.constructConfig, constructDescriptor, actionName)
             handlerLog(
               '%s#%s  with construct middleware; schema: %s, sources: %o',
               adapterPath,

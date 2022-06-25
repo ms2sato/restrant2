@@ -1,4 +1,4 @@
-import { ActionDescriptor, RouterError } from '../../client'
+import { ActionDescriptor, blankSchema, ConstructConfig, idNumberSchema, RouterError, z } from '../../client'
 
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 
@@ -52,6 +52,18 @@ const apiIndex: ActionDescriptor = {
   path: '/',
   method: 'get',
 } as const
+
+export function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
+  return {
+    build: { schema: blankSchema, sources: ['params'] },
+    edit: { schema: idSchema, sources: ['params'] },
+    show: { schema: idSchema, sources: ['params'] },
+    index: { schema: blankSchema, sources: ['params'] },
+    create: { sources: ['body', 'files', 'params'] },
+    update: { sources: ['body', 'files', 'params'] },
+    destroy: { schema: idSchema, sources: ['params'] },
+  }
+}
 
 export type Option =
   | {

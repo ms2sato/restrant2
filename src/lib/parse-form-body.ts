@@ -1,4 +1,4 @@
-import { ArrangeResult, nullArrangeResult } from './zod-util'
+import { ArrangeResult, nullArrangeResult } from './shared/zod-util'
 
 export type TraverseArranger = {
   next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void

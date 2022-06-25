@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { blankSchema } from '../../client'
 
 export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
 export type Resource = Record<string, ResourceMethod>
@@ -40,4 +41,32 @@ export interface Router {
 
 export class RouterError extends Error {}
 
-export type HandlerBuildRunner = () => Promise<void>
+export type HandlerBuildRunner = () => Promise<void> | void
+
+export const choiceSchema = (
+  defaultConstructConfig: ConstructConfig,
+  constructDescriptor: ConstructDescriptor | undefined,
+  actionName: string
+) => {
+  const defaultConstructDescriptor: ConstructDescriptor | undefined = defaultConstructConfig[actionName]
+
+  if (constructDescriptor?.schema === undefined) {
+    if (!defaultConstructDescriptor?.schema) {
+      throw new Error(`construct.${actionName}.schema not found in routes for #${actionName}`)
+    }
+    return defaultConstructDescriptor.schema
+  } else if (constructDescriptor.schema === null) {
+    return blankSchema
+  } else {
+    return constructDescriptor.schema
+  }
+}
+
+export const choiseSources = (
+  defaultConstructConfig: ConstructConfig,
+  constructDescriptor: ConstructDescriptor | undefined,
+  actionName: string
+) => {
+  const defaultConstructDescriptor: ConstructDescriptor | undefined = defaultConstructConfig[actionName]
+  return constructDescriptor?.sources || defaultConstructDescriptor?.sources || ['params']
+}

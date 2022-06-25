@@ -47,10 +47,7 @@ describe('fillDefault', () => {
 
 describe('deepCast', () => {
   test('simple', () => {
-    expect(deepCast(userSchema, { age: '20', numbers: ['1', '2'] })).toEqual({ age: 20, numbers: [1, 2] })
-  })
-
-  test('no', () => {
-    expect(deepCast(userSchema, { age: '20', numbers: ['1', '2'] })).toEqual({ age: 20, numbers: [1, 2] })
+    const ret = deepCast(userSchema, { age: '20', numbers: ['1', '2'] })
+    expect(ret).toEqual({ age: 20, numbers: [1, 2] })
   })
 })
