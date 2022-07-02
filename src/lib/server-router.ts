@@ -40,6 +40,7 @@ import {
 const log = debug('restrant2')
 const routeLog = log.extend('route')
 const handlerLog = log.extend('handler')
+const holderLog = log.extend('holder')
 
 export type ActionContextProps = {
   router: ServerRouter
@@ -687,6 +688,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
   }
 
   sub(rpath: string) {
+    holderLog('sub: %s', rpath)
     return new ResourceHolderCreateRouter(
       this.resourcesHolder,
       this.fileRoot,
@@ -697,6 +699,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
     return async () => {
+      holderLog('%s', rpath)
       const resourcePath = this.getResourcePath(rpath)
       const resourceSupport = new ResourceSupport(this.fileRoot)
       const resource = await importAndSetup<ResourceSupport, Resource>(
