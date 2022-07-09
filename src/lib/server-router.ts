@@ -305,7 +305,9 @@ export function renderDefault(ctx: ActionContext, options: any = undefined) {
     return false
   }
 
-  ctx.render(ctx.httpFilePath.replace(/^\//, ''), options)
+  const viewPath = ctx.httpFilePath.replace(/^\//, '')
+  handlerLog('renderDefault: %s', viewPath)
+  ctx.render(viewPath, options)
 }
 
 export const importAndSetup = async <S, R>(
@@ -378,7 +380,8 @@ export class ActionContextImpl implements MutableActionContext {
     return this.req.params.format
   }
   get httpFilePath() {
-    return `${this.httpPath}/${this.descriptor.action}`
+    const filePath = this.descriptor.path.endsWith('/') ? `${this.descriptor.path}index` : this.descriptor.path
+    return path.join(this.httpPath, filePath)
   }
 
   resources(): NamedResources {
