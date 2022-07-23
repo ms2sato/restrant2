@@ -22,8 +22,7 @@ export class NullActionContext implements ActionContext {
   get format(): string {
     throw new Error(this.errorMessage)
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  get input(): any {
+  get input(): unknown {
     throw new Error(this.errorMessage)
   }
   get req(): express.Request {

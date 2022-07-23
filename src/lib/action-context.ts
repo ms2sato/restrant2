@@ -11,7 +11,7 @@ export type ActionContext = {
   readonly body: express.Request['body']
   readonly query: express.Request['query']
   readonly format: string
-  readonly input: any
+  readonly input: unknown
   readonly req: express.Request
   readonly res: express.Response
   readonly httpPath: string
@@ -22,7 +22,10 @@ export type ActionContext = {
 }
 
 export type MutableActionContext = ActionContext & {
-  mergeInputs(sources: readonly string[], pred?: (input: any, source: string) => any): any
+  mergeInputs(
+    sources: readonly string[],
+    pred?: (input: Record<string, unknown>, source: string) => Record<string, unknown>
+  ): Record<string, unknown>
 }
 
 export type Handler = (ctx: ActionContext) => void | Promise<void>

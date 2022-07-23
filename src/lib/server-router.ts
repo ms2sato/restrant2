@@ -1,4 +1,4 @@
-import express from 'express'
+import express, { RequestHandler } from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
@@ -36,6 +36,7 @@ import {
   choiceSchema,
   choiseSources,
 } from '..'
+import { HttpMethod } from './shared'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -84,14 +85,14 @@ export function arrangeFormInput(ctx: MutableActionContext, sources: readonly st
 }
 
 export function arrangeJsonInput(ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject) {
-  const pred = (input: any, source: string) => {
+  const pred = (input: Record<string, unknown>, source: string) => {
     return source === 'body' ? input : SchemaUtil.deepCast(schema, input)
   }
   return ctx.mergeInputs(sources, pred)
 }
 
 export type ContentArranger = {
-  (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject): any
+  (ctx: MutableActionContext, sources: readonly string[], schema: z.AnyZodObject): unknown
 }
 
 type ContentType2Arranger = Record<string, ContentArranger>
@@ -118,19 +119,27 @@ export const createSmartInputArranger = (contentType2Arranger: ContentType2Arran
   }
 }
 
-// FIXME: @see https://google.github.io/styleguide/jsoncstyleguide.xml
-class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
-  success(ctx: ActionContext, output: Out): void | Promise<void> {
-    let data = output
-    if ('ctx' in output) {
-      data = { ...output }
-      delete (data as any).ctx
-    }
+type ContextHolder = {
+  ctx: ActionContext
+}
 
-    ctx.res.json({ status: 'success', data })
+function isContextHolder(obj: unknown): obj is ContextHolder {
+  return (obj as ContextHolder).ctx !== undefined && typeof (obj as ContextHolder).ctx === 'object'
+}
+
+// FIXME: @see https://google.github.io/styleguide/jsoncstyleguide.xml
+class StandardJsonResponder<Opt = undefined, Out = unknown, Src = unknown> implements Responder<Opt, Out, Src> {
+  success(ctx: ActionContext, output: Out): void | Promise<void> {
+    if (isContextHolder(output)) {
+      const data = { ...output }
+      const { ctx, ...dataWithoutCtx } = data
+      ctx.res.json({ status: 'success', dataWithoutCtx })
+    } else {
+      ctx.res.json({ status: 'success', output })
+    }
   }
 
-  invalid(ctx: ActionContext, validationError: ValidationError, source: Src): void | Promise<void> {
+  invalid(ctx: ActionContext, validationError: ValidationError, _source: Src): void | Promise<void> {
     ctx.res.status(422)
     ctx.res.json({
       status: 'error',
@@ -155,7 +164,7 @@ class StandardJsonResponder<Opt = undefined, Out = any, Src = any> implements Re
 
 type FatalHandler = (ctx: ActionContext, err: Error) => void
 
-class SmartResponder<Opt = undefined, Out = any, Src = any> implements Responder<Opt, Out, Src> {
+class SmartResponder<Opt = undefined, Out = unknown, Src = unknown> implements Responder<Opt, Out, Src> {
   constructor(
     private router: ServerRouter,
     private fatalHandler: FatalHandler,
@@ -244,7 +253,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 
           let input = schema.parse(source)
           if (responder && 'afterValidation' in responder) {
-            input = (await responder.afterValidation?.(ctx, input, schema)) as { [x: string]: any }
+            input = (await responder.afterValidation?.(ctx, input, schema)) as { [x: string]: unknown }
           }
 
           handlerLog('input', input)
@@ -272,23 +281,27 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
             handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
             if (responder) {
               if ('invalid' in responder) {
+                if (!responder.invalid) {
+                  throw new Error('Unreachable: invalid in responder is not implemented')
+                }
+
                 const filledSource = SchemaUtil.fillDefault(schema, source)
                 handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
                 res.status(422)
-                await responder.invalid!.apply(adapter, [ctx, validationError, filledSource, ...options])
+                await responder.invalid.apply(adapter, [ctx, validationError, filledSource, ...options])
               } else {
                 next(validationError)
               }
             } else {
               handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
-              defaultResponder.invalid(ctx, validationError, source)
+              await defaultResponder.invalid(ctx, validationError, source)
             }
           } else {
-            handleFatal(err as Error)
+            await handleFatal(err as Error)
           }
         }
       } catch (err) {
-        return handleFatal(err as Error)
+        return await handleFatal(err as Error)
       }
     })().catch((err) => {
       next(err)
@@ -296,18 +309,20 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   }
 }
 
-export const createNullActionOptions: CreateActionOptionsFunction = async (ctx, httpPath, ad) => {
-  return []
+export const createNullActionOptions: CreateActionOptionsFunction = (_ctx, _httpPath, _ad) => {
+  return Promise.resolve([])
 }
 
-export function renderDefault(ctx: ActionContext, options: any = undefined) {
+export function renderDefault(ctx: ActionContext, options: unknown = undefined) {
   if (!ctx.descriptor.page) {
     return false
   }
 
   const viewPath = ctx.httpFilePath.replace(/^\//, '')
   handlerLog('renderDefault: %s', viewPath)
-  ctx.render(viewPath, options)
+
+  // as object for Express
+  ctx.render(viewPath, options as object)
 }
 
 export const importAndSetup = async <S, R>(
@@ -349,7 +364,7 @@ export const createDefaultActionContext: ActionContextCreator = ({ router, req, 
 export class ActionContextImpl implements MutableActionContext {
   render
   redirect
-  private _input: any
+  private _input: unknown
 
   constructor(
     private router: ServerRouter,
@@ -367,6 +382,7 @@ export class ActionContextImpl implements MutableActionContext {
     return this.req.params
   }
   get body() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.req.body
   }
   get query() {
@@ -393,8 +409,11 @@ export class ActionContextImpl implements MutableActionContext {
     return this.format === 'json' || (contentType !== undefined && contentType.indexOf('application/json') >= 0)
   }
 
-  mergeInputs(sources: readonly string[], pred: (input: any, source: string) => any = (input) => input) {
-    const request = this.req as Record<string, any>
+  mergeInputs(
+    sources: readonly string[],
+    pred: (input: Record<string, unknown>, source: string) => Record<string, unknown> = (input) => input
+  ) {
+    const request = this.req as unknown as Record<string, Record<string, unknown>>
     const input = sources.reduce((prev, source) => {
       if (request[source] === undefined) {
         return prev
@@ -441,7 +460,7 @@ export abstract class BasicRouter implements Router {
     this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
   }
 
-  abstract sub(...args: any[]): Router
+  abstract sub(...args: unknown[]): Router
   protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
@@ -499,6 +518,22 @@ const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Reso
   return resourceProxy
 }
 
+type Thenable = {
+  then: (onfulfilled: (value: unknown) => unknown) => Thenable
+  catch: (onrejected: (reason: unknown) => unknown) => Thenable
+}
+
+function isThenable(obj: unknown): obj is Thenable {
+  return (obj as Thenable).then !== undefined && typeof (obj as Thenable).then === 'function'
+}
+
+type RoutingMethod = (urlPath: string, ...params: express.Handler[]) => void
+type RoutingMethodHolder = { [method: string]: RoutingMethod }
+
+function hasRoutingMethod(router: unknown, method: HttpMethod): router is RoutingMethodHolder {
+  return router instanceof Object && (router as RoutingMethodHolder)[method] instanceof Function
+}
+
 export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
@@ -512,7 +547,7 @@ export class ServerRouter extends BasicRouter {
     this.router = express.Router({ mergeParams: true })
   }
 
-  sub(rpath: string, ...args: unknown[]) {
+  sub(rpath: string, ...handlers: RequestHandler[]) {
     // TODO: impl class SubServerRouter without build
     const subRouter = new ServerRouter(
       this.fileRoot,
@@ -520,7 +555,8 @@ export class ServerRouter extends BasicRouter {
       path.join(this.httpPath, rpath),
       this.routerCore
     )
-    ;(this.router as any).use.apply(this.router, [rpath, ...args, subRouter.router])
+
+    this.router.use(rpath, ...[...handlers, subRouter.router])
     return subRouter
   }
 
@@ -587,7 +623,7 @@ export class ServerRouter extends BasicRouter {
         let params
         if (actionOverride) {
           handlerLog('%s#%s without construct middleware', adapterPath, actionName)
-          const handler: express.Handler = async (req, res, next) => {
+          const handler: express.Handler = (req, res, next) => {
             const ctx = this.serverRouterConfig.createActionContext({
               router: this,
               req,
@@ -597,7 +633,10 @@ export class ServerRouter extends BasicRouter {
             })
             try {
               handlerLog('%s#%s as Handler', adapterPath, actionName)
-              await actionFunc(ctx)
+              const ret = actionFunc(ctx)
+              if (isThenable(ret)) {
+                ret.catch(next)
+              }
             } catch (err) {
               next(err)
             }
@@ -610,7 +649,7 @@ export class ServerRouter extends BasicRouter {
               throw new Error('Unreachable: resourceMethod is undefined and action.page not set')
             }
 
-            const handler: express.Handler = async (req, res, next) => {
+            const handler: express.Handler = (req, res, next) => {
               const ctx = this.serverRouterConfig.createActionContext({
                 router: this,
                 req,
@@ -620,7 +659,7 @@ export class ServerRouter extends BasicRouter {
               })
               try {
                 handlerLog('page: %s', ctx.httpFilePath)
-                await this.serverRouterConfig.renderDefault(ctx)
+                this.serverRouterConfig.renderDefault(ctx)
               } catch (err) {
                 next(err)
               }
@@ -670,10 +709,20 @@ export class ServerRouter extends BasicRouter {
         const urlPathWithExt = `${urlPath.replace(/\/$/, '')}.:format?`
         if (actionDescriptor.method instanceof Array) {
           for (const method of actionDescriptor.method) {
-            ;(this.router as any)[method].apply(this.router, [urlPathWithExt, ...params])
+            const router = this.router as unknown
+            if (hasRoutingMethod(router, method)) {
+              router[method](urlPathWithExt, ...params)
+            } else {
+              throw new Error(`Unreachable: router is not Object or router[${method}] is not Function`)
+            }
           }
         } else {
-          ;(this.router as any)[actionDescriptor.method].apply(this.router, [urlPathWithExt, ...params])
+          const router = this.router as unknown
+          if (hasRoutingMethod(router, actionDescriptor.method)) {
+            router[actionDescriptor.method](urlPathWithExt, ...params)
+          } else {
+            throw new Error(`Unreachable: router is not Object or router[${actionDescriptor.method}] is not Function`)
+          }
         }
       }
     }

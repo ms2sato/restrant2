@@ -1,21 +1,11 @@
 import { ArrangeResult, nullArrangeResult } from './shared/zod-util'
 
 export type TraverseArranger = {
-  next: (path: string, node: Record<string, any>, value: any, pathIndex: number) => void
-  nextItem: (name: string, node: Record<string, any>, value: any, pathIndex: number) => void
-  arrangeIndexedArrayItemOnLast: (
-    name: string,
-    node: Record<string, any>,
-    value: any,
-    pathIndex: number
-  ) => ArrangeResult
-  arrangeUnindexedArrayOnLast: (
-    name: string,
-    node: Record<string, any>,
-    value: any[],
-    pathIndex: number
-  ) => ArrangeResult
-  arrangePropertyOnLast: (path: string, node: Record<string, any>, value: any, pathIndex: number) => ArrangeResult
+  next: (path: string, node: unknown, value: unknown, pathIndex: number) => void
+  nextItem: (name: string, node: unknown, value: unknown, pathIndex: number) => void
+  arrangeIndexedArrayItemOnLast: (name: string, node: unknown, value: unknown, pathIndex: number) => ArrangeResult
+  arrangeUnindexedArrayOnLast: (name: string, node: unknown, value: unknown[], pathIndex: number) => ArrangeResult
+  arrangePropertyOnLast: (path: string, node: unknown, value: unknown, pathIndex: number) => ArrangeResult
 }
 
 export type TraverseArrangerCreator = {
@@ -24,7 +14,9 @@ export type TraverseArrangerCreator = {
 
 export function nullTraverseArranger() {
   return {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     next() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     nextItem() {},
     arrangeIndexedArrayItemOnLast() {
       return nullArrangeResult
@@ -38,15 +30,18 @@ export function nullTraverseArranger() {
   }
 }
 
-function arrangedResultOrRaw({ arranged, result }: ArrangeResult, value: any) {
+function arrangedResultOrRaw({ arranged, result }: ArrangeResult, value: unknown) {
   return arranged ? result : value
 }
 
 function createTraverser(arranger: TraverseArranger, key: string) {
-  function traversePath(paths: string[], node: Record<string, any>, value: any, pathIndex: number = 0) {
+  function traversePath(paths: string[], node: unknown, value: unknown, pathIndex = 0) {
     if (paths.length === 0) return
 
-    const path = paths.shift()!
+    const path = paths.shift()
+    if (!path) {
+      throw new Error('path is empty')
+    }
 
     const arrayFirst = path.indexOf('[')
     const arrayLast = path.indexOf(']')
@@ -67,6 +62,7 @@ function createTraverser(arranger: TraverseArranger, key: string) {
       const name = path.substring(0, arrayFirst)
       const indexStr = path.substring(arrayFirst + 1, arrayLast)
 
+      const recordNode = node as Record<string, unknown>
       if (indexStr.length !== 0) {
         // format: name[index]
 
@@ -75,30 +71,34 @@ function createTraverser(arranger: TraverseArranger, key: string) {
           throw new Error(`index must be number : ${path}`)
         }
 
-        if (node[name] === undefined) {
-          node[name] = []
+        let arrayNodeItem = recordNode[name] as unknown[]
+        if (arrayNodeItem === undefined) {
+          recordNode[name] = arrayNodeItem = []
         }
 
         if (paths.length === pathIndex) {
-          arranger.next(name, node, value, pathIndex)
-          node[name][index] = arrangedResultOrRaw(
-            arranger.arrangeIndexedArrayItemOnLast(name, node, value, pathIndex),
+          arranger.next(name, recordNode, value, pathIndex)
+          arrayNodeItem[index] = arrangedResultOrRaw(
+            arranger.arrangeIndexedArrayItemOnLast(name, recordNode, value, pathIndex),
             value
           )
         } else {
-          if (node[name][index] === undefined) {
-            node[name][index] = {}
+          if (arrayNodeItem[index] === undefined) {
+            arrayNodeItem[index] = {}
           }
-          arranger.nextItem(name, node, value, pathIndex)
-          traversePath(paths, node[name][index], value, pathIndex++)
+          arranger.nextItem(name, recordNode, value, pathIndex)
+          traversePath(paths, arrayNodeItem[index], value, pathIndex++)
         }
       } else {
         // format: name[]
 
-        arranger.next(name, node, value, pathIndex)
+        arranger.next(name, recordNode, value, pathIndex)
         if (paths.length === pathIndex) {
           const array = value === undefined ? [] : value instanceof Array ? value : [value]
-          node[name] = arrangedResultOrRaw(arranger.arrangeUnindexedArrayOnLast(name, node, array, pathIndex), array)
+          recordNode[name] = arrangedResultOrRaw(
+            arranger.arrangeUnindexedArrayOnLast(name, recordNode, array, pathIndex),
+            array
+          )
         } else {
           throw new Error('Unimplemented')
         }
@@ -110,17 +110,18 @@ function createTraverser(arranger: TraverseArranger, key: string) {
     }
 
     arranger.next(path, node, value, pathIndex)
-    if (node[path] === undefined) {
-      node[path] = {}
+    const recordNode = node as Record<string, unknown>
+    if (recordNode[path] === undefined) {
+      recordNode[path] = {}
     }
     if (paths.length === pathIndex) {
       if (value instanceof Array) {
         throw new Error(`Unexpected array input for single property name[${key}]: proposal '${path}[]'?`)
       }
 
-      node[path] = arrangedResultOrRaw(arranger.arrangePropertyOnLast(path, node, value, pathIndex), value)
+      recordNode[path] = arrangedResultOrRaw(arranger.arrangePropertyOnLast(path, recordNode, value, pathIndex), value)
     } else {
-      traversePath(paths, node[path], value, pathIndex++)
+      traversePath(paths, recordNode[path], value, pathIndex++)
     }
   }
 
@@ -128,10 +129,10 @@ function createTraverser(arranger: TraverseArranger, key: string) {
 }
 
 export function parseFormBody(
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   arrangerCreator: TraverseArrangerCreator = nullTraverseArranger
-): any {
-  const ret: Record<string, any> = {}
+): Record<string, unknown> {
+  const ret: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(body)) {
     createTraverser(arrangerCreator(), key)(key.split('.'), ret, value)
   }

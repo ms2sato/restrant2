@@ -1,6 +1,6 @@
 {
   "name": "restrant2",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "",
   "files": [
     "dist"
@@ -19,11 +19,11 @@
   "main": "./dist/index.js",
   "scripts": {
     "watch": "npm run clean && npx tsc -w",
-    "prebuild": "npm run clean",
+    "prebuild": "npm run clean && npm run lint && npm run format",
     "build": "npx tsc",
     "check-types": "npx tsc --noEmit",
-    "eslint": "npx eslint src/index.ts",
-    "eslint:fix": "npx eslint src/index.ts --fix",
+    "eslint": "npx eslint ./src/**/*.ts",
+    "eslint:fix": "npx eslint ./src/**/*.ts --fix",
     "lint": "npm run eslint && npm run check-types",
     "lint:fix": "npm run eslint:fix && npm run check-types && npm run format",
     "format": "npx prettier --write 'src/**/*.{js,ts,json}'",

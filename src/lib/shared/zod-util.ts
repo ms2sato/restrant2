@@ -62,12 +62,11 @@ type TraverseBlankValueCallback = {
 function traverseBlankValue<S extends z.AnyZodObject>(schema: S, obj: unknown, callback: TraverseBlankValueCallback) {
   const shape = schema.shape as Record<string, z.AnyZodObject>
   for (const [key, subSchema] of Object.entries(shape)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (key in (obj as any)) {
-      const record = obj as Record<string, unknown>
+    const record = obj as Record<string, unknown>
+    if (key in record) {
       if (record[key] instanceof Array) {
         if (subSchema instanceof z.ZodArray) {
-          for (const item of (record[key] as unknown[])) {
+          for (const item of record[key] as unknown[]) {
             traverseBlankValue(subSchema.element, item, callback)
           }
         }
