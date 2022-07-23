@@ -8,27 +8,27 @@ export default defineResource((_support, _routeConfig) => {
   const taskStore = new TaskStore()
 
   return {
-    index: () => {
+    index() {
       return taskStore.all()
     },
 
-    create: (params: TaskCreateParams) => {
+    create(params: TaskCreateParams) {
       return taskStore.create(params)
     },
 
-    edit: ({ id }: IdNumberParams) => {
+    edit({ id }: IdNumberParams) {
       return taskStore.find(id)
     },
 
-    update: (params: TaskUpdateParams) => {
+    update(params: TaskUpdateParams) {
       return taskStore.update(params)
     },
 
-    destroy: ({ id }: IdNumberParams) => {
+    destroy({ id }: IdNumberParams) {
       return taskStore.destroy(id)
     },
 
-    done: ({ id }: IdNumberParams) => {
+    done({ id }: IdNumberParams) {
       return taskStore.done(id)
     },
   }

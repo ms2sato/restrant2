@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { blankSchema } from '../../client'
 
-export type ResourceMethod = (input?: unknown, ...args: unknown[]) => unknown | Promise<unknown>
+// for type Resource to TypeSafe
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
 export type Resource = Record<string, ResourceMethod>
 export type NamedResources = {
   [name: string]: Resource

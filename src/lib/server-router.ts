@@ -259,6 +259,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
           handlerLog('input', input)
           const args = input ? [input, ...options] : options
           handlerLog('resourceMethod args: %o', args)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const output = await resourceMethod.apply(resource, args)
 
           if (responder && 'success' in responder) {
@@ -506,10 +507,12 @@ const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Reso
         if (parsedInput === undefined) {
           throw new Error('UnexpectedInput')
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment
         return resourceMethod.apply(resource, [parsedInput, ...options])
       }
     } else {
       resourceProxy[actionName] = function (...args) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return resourceMethod.apply(resource, args)
       }
     }

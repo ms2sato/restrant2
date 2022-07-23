@@ -7,6 +7,7 @@ import {
   ResourceSupport,
   Responder,
   RouteConfig,
+  Handler,
 } from '..'
 
 export function defineResource<R extends Resource>(callback: (support: ResourceSupport, config: RouteConfig) => R) {
@@ -24,7 +25,8 @@ export function defineAdapter<AR>(callback: (support: ActionSupport, config: Rou
 }
 
 export type AdapterOf<R extends ResourceFunc, Opt = undefined> = {
-  [key in keyof ReturnType<R>]:
-    | Responder<Opt, Awaited<ReturnType<ReturnType<R>[key]>>, Partial<Parameters<ReturnType<R>[key]>[0]>>
-    | RequestCallback<Parameters<ReturnType<R>[key]>[0]>
+  [actionName in keyof ReturnType<R>]:
+    | Handler
+    | Responder<Opt, Awaited<ReturnType<ReturnType<R>[actionName]>>, Partial<Parameters<ReturnType<R>[actionName]>[0]>>
+    | RequestCallback<Parameters<ReturnType<R>[actionName]>[0]>
 }

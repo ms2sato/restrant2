@@ -1,6 +1,6 @@
 import path from 'path'
 import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
-import { IdNumberParams, defineResource, UploadedFile } from 'restrant2'
+import { IdNumberParams, UploadedFile, defineResource } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 import { save } from '../../../../lib/upload'
 
@@ -34,11 +34,11 @@ export default defineResource((support, _options) => {
   }
 
   return {
-    index: (_option: AcceptLanguageOption) => {
+    index(_option: AcceptLanguageOption) {
       return Array.from(users, ([_id, data]) => data)
     },
 
-    create: async (params: UserCreateParams) => {
+    async create(params: UserCreateParams) {
       const { photo, ...data } = params
 
       const user: User = {
@@ -51,11 +51,11 @@ export default defineResource((support, _options) => {
       return user
     },
 
-    edit: (params: AdminWithIdNumberParams) => {
+    edit(params: AdminWithIdNumberParams) {
       return get(params.id)
     },
 
-    update: async (params: UserUpdateParams) => {
+    async update(params: UserUpdateParams) {
       const { id, photo, ...data } = params
 
       const user = { ...get(id), ...data }
@@ -67,13 +67,13 @@ export default defineResource((support, _options) => {
       return user
     },
 
-    destroy: (params: IdNumberParams) => {
+    destroy(params: IdNumberParams) {
       const user = get(params.id)
       users.delete(params.id)
       return user
     },
 
-    photo: (params: AdminWithIdNumberParams) => {
+    photo(params: AdminWithIdNumberParams) {
       const user = get(params.id)
       if (!user.photo) {
         return null

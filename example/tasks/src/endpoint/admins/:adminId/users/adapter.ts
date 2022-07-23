@@ -21,7 +21,7 @@ export default defineAdapter<Adapter>((_support, _routeConfig): Adapter => {
     },
 
     create: {
-      afterValidation: (ctx, input) => {
+      afterValidation(ctx, input) {
         if (!input.photo && input.photoCache) {
           input.photo = globalUploadedFileCache.load(input.photoCache)
         }

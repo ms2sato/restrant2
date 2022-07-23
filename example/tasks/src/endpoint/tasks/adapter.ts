@@ -6,7 +6,7 @@ type Adapter = AdapterOf<typeof resource> & { build: Handler }
 export default defineAdapter((_support, _routeConfig): Adapter => {
   return {
     index: {
-      success: (ctx, output) => {
+      success(ctx, output) {
         if (ctx.format === 'json') {
           ctx.res.json({ data: output, status: 'success' })
         } else {
@@ -15,38 +15,42 @@ export default defineAdapter((_support, _routeConfig): Adapter => {
       },
     },
 
-    build: (ctx) => ctx.render('tasks/build', { task: { subtasks: [] } }),
+    build(ctx) {
+      ctx.render('tasks/build', { task: { subtasks: [] } })
+    },
 
     edit: {
-      success: (ctx, output) => ctx.render('tasks/edit', { task: output }),
+      success(ctx, output) {
+        ctx.render('tasks/edit', { task: output })
+      },
     },
 
     create: {
-      success: (ctx) => {
+      success(ctx) {
         ctx.redirect('/tasks')
       },
-      invalid: (ctx, err, source) => {
+      invalid(ctx, err, source) {
         ctx.render('tasks/build', { task: source, err })
       },
     },
 
     update: {
-      success: (ctx) => {
+      success(ctx) {
         ctx.redirect('/tasks')
       },
-      invalid: (ctx, err, source) => {
+      invalid(ctx, err, source) {
         ctx.render('tasks/edit', { task: source, err })
       },
     },
 
     destroy: {
-      success: (ctx) => {
+      success(ctx) {
         ctx.redirect('/tasks')
       },
     },
 
     done: {
-      success: (ctx) => {
+      success(ctx) {
         ctx.redirect('/tasks')
       },
     },
