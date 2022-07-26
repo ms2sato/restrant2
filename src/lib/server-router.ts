@@ -426,6 +426,10 @@ export class ActionContextImpl implements MutableActionContext {
     this._input = input
     return input
   }
+
+  responseInvalid(_path: string, _error: ValidationError, _source: unknown): void {
+    throw new Error('Unimplemented')
+  }
 }
 
 export function defaultServerRouterConfig(): ServerRouterConfig {

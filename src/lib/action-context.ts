@@ -18,7 +18,8 @@ export type ActionContext = {
   readonly httpFilePath: string
   readonly descriptor: ActionDescriptor
   readonly willRespondJson: () => boolean
-  resources: () => NamedResources
+  resources(): NamedResources
+  responseInvalid(path: string, error: ValidationError, source: unknown): void // response for ValidationError
 }
 
 export type MutableActionContext = ActionContext & {

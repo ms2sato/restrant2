@@ -1,5 +1,5 @@
 import express from 'express'
-import { NamedResources, ActionContext, ActionDescriptor } from '..'
+import { NamedResources, ActionContext, ActionDescriptor, ValidationError } from '..'
 
 export class NullActionContext implements ActionContext {
   private errorMessage = 'Cannot access this ActionContext(May not request context)'
@@ -45,5 +45,8 @@ export class NullActionContext implements ActionContext {
   }
   resources(): NamedResources {
     throw new Error(this.errorMessage)
+  }
+  responseInvalid(_path: string, _error: ValidationError, _source: unknown): void {
+    throw new Error('Unimplemented')
   }
 }
