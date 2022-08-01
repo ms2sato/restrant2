@@ -133,9 +133,9 @@ class StandardJsonResponder<Opt = undefined, Out = unknown, Src = unknown> imple
     if (isContextHolder(output)) {
       const data = { ...output }
       const { ctx, ...dataWithoutCtx } = data
-      ctx.res.json({ status: 'success', dataWithoutCtx })
+      ctx.res.json({ status: 'success', data: dataWithoutCtx })
     } else {
-      ctx.res.json({ status: 'success', output })
+      ctx.res.json({ status: 'success', data: output })
     }
   }
 
