@@ -1,4 +1,4 @@
-import express, { RequestHandler } from 'express'
+import express, { NextFunction, RequestHandler } from 'express'
 import path from 'path'
 import { z } from 'zod'
 import debug from 'debug'
@@ -35,8 +35,9 @@ import {
   NamedResources,
   choiceSchema,
   choiseSources,
+  blankSchema,
 } from '..'
-import { HttpMethod } from './shared'
+import { HttpMethod, opt } from './shared'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -223,86 +224,100 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   const defaultResponder = serverRouterConfig.createDefaultResponder(params)
   const actionName = actionDescriptor.action
 
+  const respond = async (ctx: ActionContext, output: unknown, options: unknown) => {
+    if (responder && 'success' in responder) {
+      handlerLog('%s#%s.success', adapterPath, actionName)
+      const ret = await responder.success?.apply(adapter, [ctx, output, options])
+      if (ret === false) {
+        handlerLog(' dispatch to default responder')
+        defaultResponder.success(ctx, output)
+      } else if (ret !== undefined) {
+        handlerLog(' dispatch to default responder for ret value')
+        defaultResponder.success(ctx, ret)
+      }
+    } else {
+      handlerLog('%s#%s success by default responder', adapterPath, actionName)
+      defaultResponder.success(ctx, output)
+    }
+  }
+
+  const handleFatal = async (ctx: ActionContext, err: Error, options: unknown, next: NextFunction) => {
+    if (responder && 'fatal' in responder) {
+      try {
+        handlerLog('%s#%s.fatal', adapterPath, actionName)
+        await responder.fatal?.apply(adapter, [ctx, err, options])
+      } catch (er) {
+        console.log('Unexpected Error on responder.fatal, dispatch to default responder', er)
+        await defaultResponder.fatal(ctx, err)
+      }
+    } else {
+      return next(err)
+    }
+  }
+
   return (req, res, next) => {
     ;(async () => {
       const ctx = serverRouterConfig.createActionContext({ router, req, res, descriptor: actionDescriptor, httpPath })
       const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
-      const handleFatal = async (err: Error) => {
-        if (responder && 'fatal' in responder) {
-          try {
-            handlerLog('%s#%s.fatal', adapterPath, actionName)
-            await responder.fatal?.apply(adapter, [ctx, err, ...options])
-          } catch (er) {
-            console.log('Unexpected Error on responder.fatal, dispatch to default responder', er)
-            await defaultResponder.fatal(ctx, err)
-          }
-        } else {
-          return next(err)
-        }
-      }
-
-      try {
-        let source = serverRouterConfig.inputArranger(ctx, sources, schema)
-        handlerLog('source: %o', source)
-
+      const wrappedOptions = new opt(options)
+      if (schema == blankSchema) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const output = await resourceMethod.apply(resource, [wrappedOptions])
+        await respond(ctx, output, options)
+      } else {
         try {
-          if (responder && 'beforeValidation' in responder) {
-            source = await responder.beforeValidation?.(ctx, source, schema)
-          }
+          let source = serverRouterConfig.inputArranger(ctx, sources, schema)
+          handlerLog('source: %o', source)
 
-          let input = schema.parse(source)
-          if (responder && 'afterValidation' in responder) {
-            input = (await responder.afterValidation?.(ctx, input, schema)) as { [x: string]: unknown }
-          }
-
-          handlerLog('input', input)
-          const args = input ? [input, ...options] : options
-          handlerLog('resourceMethod args: %o', args)
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const output = await resourceMethod.apply(resource, args)
-
-          if (responder && 'success' in responder) {
-            handlerLog('%s#%s.success', adapterPath, actionName)
-            const ret = await responder.success?.apply(adapter, [ctx, output, ...options])
-            if (ret === false) {
-              handlerLog(' dispatch to default responder')
-              defaultResponder.success(ctx, output)
-            } else if (ret !== undefined) {
-              handlerLog(' dispatch to default responder for ret value')
-              defaultResponder.success(ctx, ret)
+          try {
+            if (responder && 'beforeValidation' in responder) {
+              source = await responder.beforeValidation?.(ctx, source, schema)
             }
-          } else {
-            handlerLog('%s#%s success by default responder', adapterPath, actionName)
-            defaultResponder.success(ctx, output)
-          }
-        } catch (err) {
-          if (err instanceof z.ZodError) {
-            const validationError = err
-            handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
-            if (responder) {
-              if ('invalid' in responder) {
-                if (!responder.invalid) {
-                  throw new Error('Unreachable: invalid in responder is not implemented')
-                }
 
-                const filledSource = SchemaUtil.fillDefault(schema, source)
-                handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
-                res.status(422)
-                await responder.invalid.apply(adapter, [ctx, validationError, filledSource, ...options])
+            let input: { [x: string]: unknown } = schema.parse(source)
+            if (responder && 'afterValidation' in responder) {
+              input = (await responder.afterValidation?.(ctx, input, schema)) as { [x: string]: unknown }
+            }
+
+            handlerLog('input', input)
+            if (input) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              const output = await resourceMethod.apply(resource, [input, wrappedOptions])
+              await respond(ctx, output, options)
+            } else {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              const output = await resourceMethod.apply(resource, [wrappedOptions])
+              await respond(ctx, output, options)
+            }
+          } catch (err) {
+            if (err instanceof z.ZodError) {
+              const validationError = err
+              handlerLog.extend('debug')('%s#%s validationError %s', adapterPath, actionName, validationError.message)
+              if (responder) {
+                if ('invalid' in responder) {
+                  if (!responder.invalid) {
+                    throw new Error('Unreachable: invalid in responder is not implemented')
+                  }
+
+                  const filledSource = SchemaUtil.fillDefault(schema, source)
+                  handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
+                  res.status(422)
+                  await responder.invalid.apply(adapter, [ctx, validationError, filledSource, options])
+                } else {
+                  next(validationError)
+                }
               } else {
-                next(validationError)
+                handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
+                await defaultResponder.invalid(ctx, validationError, source)
               }
             } else {
-              handlerLog('%s#%s invalid by default responder', adapterPath, actionName)
-              await defaultResponder.invalid(ctx, validationError, source)
+              await handleFatal(ctx, err as Error, options, next)
             }
-          } else {
-            await handleFatal(err as Error)
           }
+        } catch (err) {
+          return await handleFatal(ctx, err as Error, options, next)
         }
-      } catch (err) {
-        return await handleFatal(err as Error)
       }
     })().catch((err) => {
       next(err)
@@ -311,7 +326,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
 }
 
 export const createNullActionOptions: CreateActionOptionsFunction = (_ctx, _httpPath, _ad) => {
-  return Promise.resolve([])
+  return Promise.resolve(undefined)
 }
 
 export function renderDefault(ctx: ActionContext, options: unknown = undefined) {
@@ -506,18 +521,26 @@ const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Reso
     const cad: ConstructDescriptor | undefined = config.construct?.[actionName]
     if (cad?.schema) {
       const schema = cad.schema
-      resourceProxy[actionName] = function (input, ...options) {
-        const parsedInput = schema.parse(input)
-        if (parsedInput === undefined) {
-          throw new Error('UnexpectedInput')
+      resourceProxy[actionName] = function (...args) {
+        if (args.length === 0) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return resourceMethod.apply(resource)
+        } else if (args[0] instanceof opt) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return resourceMethod.apply(resource, [args[0]])
+        } else {
+          const parsedInput = schema.parse(args[0])
+          if (parsedInput === undefined) {
+            throw new Error('UnexpectedInput')
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return resourceMethod.apply(resource, args)
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment
-        return resourceMethod.apply(resource, [parsedInput, ...options])
       }
     } else {
-      resourceProxy[actionName] = function (...args) {
+      resourceProxy[actionName] = function (options) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return resourceMethod.apply(resource, args)
+        return resourceMethod.apply(resource, [options])
       }
     }
   }

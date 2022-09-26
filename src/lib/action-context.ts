@@ -32,9 +32,9 @@ export type MutableActionContext = ActionContext & {
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
 export type MultiOptionResponder = {
-  success?: (ctx: ActionContext, output: unknown, ...options: unknown[]) => unknown | Promise<unknown>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: unknown, ...options: unknown[]) => void | Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, ...options: unknown[]) => void | Promise<void>
+  success?: (ctx: ActionContext, output: unknown, options: unknown) => unknown | Promise<unknown>
+  invalid?: (ctx: ActionContext, err: ValidationError, source: unknown, options: unknown) => void | Promise<void>
+  fatal?: (ctx: ActionContext, err: Error, options: unknown) => void | Promise<void>
 }
 
 export type Responder<Opt = undefined, Out = unknown, Src = unknown> = {
@@ -60,7 +60,7 @@ export type CreateActionOptionsFunction = (
   ctx: ActionContext,
   httpPath: string,
   ad: ActionDescriptor
-) => unknown[] | Promise<unknown[]>
+) => unknown | Promise<unknown>
 
 /**
  * @returns If not rendered return false.

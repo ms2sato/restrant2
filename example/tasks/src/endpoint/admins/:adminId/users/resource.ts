@@ -1,6 +1,6 @@
 import path from 'path'
 import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
-import { IdNumberParams, UploadedFile, defineResource } from 'restrant2'
+import { IdNumberParams, UploadedFile, defineResource, opt } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 import { save } from '../../../../lib/upload'
 
@@ -34,7 +34,10 @@ export default defineResource((support, _options) => {
   }
 
   return {
-    index(_option: AcceptLanguageOption) {
+    index(options: opt<AcceptLanguageOption>) {
+      console.log('####################')
+      console.log(options)
+      console.log(options.body)
       return Array.from(users, ([_id, data]) => data)
     },
 

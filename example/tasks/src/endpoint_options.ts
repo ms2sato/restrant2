@@ -14,5 +14,5 @@ export const createActionOptions: CreateActionOptionsFunction = async (ctx, _htt
   const option: AcceptLanguageOption = {
     languages: acceptLanguage?.split(',') || [],
   }
-  return [option]
+  return option
 }
