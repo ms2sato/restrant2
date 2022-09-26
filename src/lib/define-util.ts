@@ -1,6 +1,5 @@
 import {
   ActionSupport,
-  MultiOptionAdapter,
   RequestCallback,
   Resource,
   ResourceFunc,
@@ -11,12 +10,6 @@ import {
 } from '..'
 
 export function defineResource<R extends Resource>(callback: (support: ResourceSupport, config: RouteConfig) => R) {
-  return callback
-}
-
-export function defineMultiOptionAdapter(
-  callback: (support: ActionSupport, config: RouteConfig) => MultiOptionAdapter
-) {
   return callback
 }
 

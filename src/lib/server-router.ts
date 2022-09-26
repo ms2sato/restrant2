@@ -10,12 +10,11 @@ import {
   ConstructConfig,
   ConstructDescriptor,
   ConstructSource,
-  CreateActionOptionsFunction,
+  CreateActionOptionFunction,
   Handler,
   InputArranger,
   Renderer,
-  MultiOptionAdapter,
-  MultiOptionResponder,
+  Adapter,
   ResourceSupport,
   RouteConfig,
   Router,
@@ -63,14 +62,14 @@ export type ResourceMethodHandlerParams = {
   schema: z.AnyZodObject
   adapterPath: string
   actionDescriptor: ActionDescriptor
-  responder: MultiOptionResponder | RequestCallback
-  adapter: MultiOptionAdapter
+  responder: Responder | RequestCallback
+  adapter: Adapter
 }
 
 export type ServerRouterConfig = {
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
-  createActionOptions: CreateActionOptionsFunction
+  createActionOptions: CreateActionOptionFunction
   createActionContext: ActionContextCreator
   constructConfig: ConstructConfig
   createDefaultResponder: (params: ResourceMethodHandlerParams) => Required<Responder>
@@ -224,10 +223,10 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   const defaultResponder = serverRouterConfig.createDefaultResponder(params)
   const actionName = actionDescriptor.action
 
-  const respond = async (ctx: ActionContext, output: unknown, options: unknown) => {
+  const respond = async (ctx: ActionContext, output: unknown, option: unknown) => {
     if (responder && 'success' in responder) {
       handlerLog('%s#%s.success', adapterPath, actionName)
-      const ret = await responder.success?.apply(adapter, [ctx, output, options])
+      const ret = await responder.success?.apply(adapter, [ctx, output, option])
       if (ret === false) {
         handlerLog(' dispatch to default responder')
         defaultResponder.success(ctx, output)
@@ -241,11 +240,11 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
     }
   }
 
-  const handleFatal = async (ctx: ActionContext, err: Error, options: unknown, next: NextFunction) => {
+  const handleFatal = async (ctx: ActionContext, err: Error, option: unknown, next: NextFunction) => {
     if (responder && 'fatal' in responder) {
       try {
         handlerLog('%s#%s.fatal', adapterPath, actionName)
-        await responder.fatal?.apply(adapter, [ctx, err, options])
+        await responder.fatal?.apply(adapter, [ctx, err, option])
       } catch (er) {
         console.log('Unexpected Error on responder.fatal, dispatch to default responder', er)
         await defaultResponder.fatal(ctx, err)
@@ -258,13 +257,13 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   return (req, res, next) => {
     ;(async () => {
       const ctx = serverRouterConfig.createActionContext({ router, req, res, descriptor: actionDescriptor, httpPath })
-      const options = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
+      const option = await serverRouterConfig.createActionOptions(ctx, httpPath, actionDescriptor)
 
-      const wrappedOptions = new opt(options)
+      const wrappedOption = new opt(option)
       if (schema == blankSchema) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const output = await resourceMethod.apply(resource, [wrappedOptions])
-        await respond(ctx, output, options)
+        const output = await resourceMethod.apply(resource, [wrappedOption])
+        await respond(ctx, output, option)
       } else {
         try {
           let source = serverRouterConfig.inputArranger(ctx, sources, schema)
@@ -283,12 +282,12 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
             handlerLog('input', input)
             if (input) {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const output = await resourceMethod.apply(resource, [input, wrappedOptions])
-              await respond(ctx, output, options)
+              const output = await resourceMethod.apply(resource, [input, wrappedOption])
+              await respond(ctx, output, option)
             } else {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const output = await resourceMethod.apply(resource, [wrappedOptions])
-              await respond(ctx, output, options)
+              const output = await resourceMethod.apply(resource, [wrappedOption])
+              await respond(ctx, output, option)
             }
           } catch (err) {
             if (err instanceof z.ZodError) {
@@ -303,7 +302,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
                   const filledSource = SchemaUtil.fillDefault(schema, source)
                   handlerLog('%s#%s.invalid', adapterPath, actionName, filledSource)
                   res.status(422)
-                  await responder.invalid.apply(adapter, [ctx, validationError, filledSource, options])
+                  await responder.invalid.apply(adapter, [ctx, validationError, filledSource, option])
                 } else {
                   next(validationError)
                 }
@@ -312,11 +311,11 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
                 await defaultResponder.invalid(ctx, validationError, source)
               }
             } else {
-              await handleFatal(ctx, err as Error, options, next)
+              await handleFatal(ctx, err as Error, option, next)
             }
           }
         } catch (err) {
-          return await handleFatal(ctx, err as Error, options, next)
+          return await handleFatal(ctx, err as Error, option, next)
         }
       }
     })().catch((err) => {
@@ -325,7 +324,7 @@ const createResourceMethodHandler = (params: ResourceMethodHandlerParams): expre
   }
 }
 
-export const createNullActionOptions: CreateActionOptionsFunction = (_ctx, _httpPath, _ad) => {
+export const createNullActionOption: CreateActionOptionFunction = (_ctx, _httpPath, _ad) => {
   return Promise.resolve(undefined)
 }
 
@@ -451,7 +450,7 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
   return {
     actions: Actions.standard(),
     inputArranger: createSmartInputArranger(),
-    createActionOptions: createNullActionOptions,
+    createActionOptions: createNullActionOption,
     createActionContext: createDefaultActionContext,
     constructConfig: Actions.defaultConstructConfig(),
     createDefaultResponder: createSmartResponder,
@@ -538,9 +537,9 @@ const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Reso
         }
       }
     } else {
-      resourceProxy[actionName] = function (options) {
+      resourceProxy[actionName] = function (option) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return resourceMethod.apply(resource, [options])
+        return resourceMethod.apply(resource, [option])
       }
     }
   }
@@ -613,7 +612,7 @@ export class ServerRouter extends BasicRouter {
       this.routerCore.nameToResource.set(resourceName, createLocalResourceProxy(routeConfig, resource))
 
       const adapterPath = this.getAdapterPath(rpath)
-      const adapter: MultiOptionAdapter = await importAndSetup<ActionSupport, MultiOptionAdapter>(
+      const adapter: Adapter = await importAndSetup<ActionSupport, Adapter>(
         this.fileRoot,
         adapterPath,
         new ActionSupport(this.fileRoot),
@@ -627,7 +626,7 @@ export class ServerRouter extends BasicRouter {
         const resourceHttpPath = this.getHttpPath(rpath)
 
         const resourceMethod: ResourceMethod | undefined = resource[actionName]
-        const actionFunc: Handler | MultiOptionResponder | RequestCallback | undefined = adapter[actionName]
+        const actionFunc: Handler | Responder | RequestCallback | undefined = adapter[actionName]
         const constructDescriptor: ConstructDescriptor | undefined = routeConfig.construct?.[actionName]
 
         const actionOverride = actionFunc instanceof Function
