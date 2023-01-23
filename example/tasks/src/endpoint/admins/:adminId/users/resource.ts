@@ -34,10 +34,7 @@ export default defineResource((support, _options) => {
   }
 
   return {
-    index(option: opt<AcceptLanguageOption>) {
-      console.log('####################')
-      console.log(option)
-      console.log(option.body)
+    index(_option: opt<AcceptLanguageOption>) {
       return Array.from(users, ([_id, data]) => data)
     },
 
