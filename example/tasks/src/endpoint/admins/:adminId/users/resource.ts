@@ -1,6 +1,6 @@
 import path from 'path'
 import { UserCreateParams, UserUpdateParams, AdminWithIdNumberParams } from '../../../../params'
-import { IdNumberParams, UploadedFile, defineResource, opt } from 'restrant2'
+import { IdNumberParams, UploadedFile, defineResource, opt, Resource } from 'restrant2'
 import { AcceptLanguageOption } from '../../../../endpoint_options'
 import { save } from '../../../../lib/upload'
 
@@ -81,5 +81,5 @@ export default defineResource((support, _options) => {
 
       return path.join(resourceRoot, user.photo)
     },
-  }
+  } as const satisfies Resource
 })

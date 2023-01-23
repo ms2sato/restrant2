@@ -1,7 +1,7 @@
 import { TaskStore } from '../../models/TaskStore'
 
 import { TaskCreateParams, TaskUpdateParams } from '../../params'
-import { IdNumberParams, defineResource } from 'restrant2'
+import { IdNumberParams, defineResource, Resource } from 'restrant2'
 
 export default defineResource((_support, _routeConfig) => {
   TaskStore.reset()
@@ -31,5 +31,5 @@ export default defineResource((_support, _routeConfig) => {
     done({ id }: IdNumberParams) {
       return taskStore.done(id)
     },
-  }
+  } as const satisfies Resource
 })
