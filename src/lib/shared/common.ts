@@ -1,9 +1,13 @@
 import { z } from 'zod'
-import { blankSchema } from '../../client'
+import { blankSchema } from './schemas'
 
-// for type Resource to TypeSafe
+export class opt<T> {
+  constructor(public body: T) {}
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type ResourceMethod = (input?: any, ...args: any[]) => any | Promise<any>
+export type ResourceMethod = (...args: any[]) => any | Promise<any>
+
 export type Resource = Record<string, ResourceMethod>
 export type NamedResources = {
   [name: string]: Resource

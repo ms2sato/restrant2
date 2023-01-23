@@ -31,13 +31,7 @@ export type MutableActionContext = ActionContext & {
 
 export type Handler = (ctx: ActionContext) => void | Promise<void>
 
-export type MultiOptionResponder = {
-  success?: (ctx: ActionContext, output: unknown, ...options: unknown[]) => unknown | Promise<unknown>
-  invalid?: (ctx: ActionContext, err: ValidationError, source: unknown, ...options: unknown[]) => void | Promise<void>
-  fatal?: (ctx: ActionContext, err: Error, ...options: unknown[]) => void | Promise<void>
-}
-
-export type Responder<Opt = undefined, Out = unknown, Src = unknown> = {
+export type Responder<Opt = unknown, Out = unknown, Src = unknown> = {
   success?: (ctx: ActionContext, output: Out, option?: Opt) => unknown | Promise<unknown>
   invalid?: (ctx: ActionContext, err: ValidationError, source: Src, option?: Opt) => void | Promise<void>
   fatal?: (ctx: ActionContext, err: Error, option?: Opt) => void | Promise<void>
@@ -48,19 +42,15 @@ export type RequestCallback<In = unknown> = {
   afterValidation?: (ctx: ActionContext, input: In, schema: z.AnyZodObject) => unknown
 }
 
-export type MultiOptionAdapter = {
-  [key: string]: Handler | MultiOptionResponder | RequestCallback
-}
-
-export type Adapter<Opt = undefined, In = unknown> = {
+export type Adapter<Opt = unknown, In = unknown> = {
   [key: string]: Handler | Responder<Opt> | RequestCallback<In>
 }
 
-export type CreateActionOptionsFunction = (
+export type CreateActionOptionFunction = (
   ctx: ActionContext,
   httpPath: string,
   ad: ActionDescriptor
-) => unknown[] | Promise<unknown[]>
+) => unknown | Promise<unknown>
 
 /**
  * @returns If not rendered return false.
@@ -79,4 +69,4 @@ export class ResourceSupport {
 
 export type EndpointFunc<S, R> = (support: S, config: RouteConfig) => R
 export type ResourceFunc = EndpointFunc<ResourceSupport, Resource>
-export type ActionFunc = EndpointFunc<ActionSupport, MultiOptionAdapter>
+export type ActionFunc = EndpointFunc<ActionSupport, Adapter>
