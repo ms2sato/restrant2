@@ -2,56 +2,63 @@ import { ActionDescriptor, blankSchema, ConstructConfig, idNumberSchema, RouterE
 
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 
-const build: ActionDescriptor = {
+export const build = {
   action: 'build',
   path: '/build',
   method: 'get',
   page: true,
-} as const
-const edit: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const edit = {
   action: 'edit',
   path: '/:id/edit',
   method: 'get',
   page: true,
-} as const
-const show: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const show = {
   action: 'show',
   path: '/:id',
   method: 'get',
   page: true,
-} as const
-const index: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const index = {
   action: 'index',
   path: '/',
   method: 'get',
   page: true,
-} as const
-const create: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const create = {
   action: 'create',
   path: '/',
   method: 'post',
-} as const
-const update: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const update = {
   action: 'update',
   path: '/:id',
   method: ['put', 'patch'],
-} as const
-const destroy: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const destroy = {
   action: 'destroy',
   path: '/:id',
   method: 'delete',
-} as const
+} as const satisfies ActionDescriptor
 
-const apiShow: ActionDescriptor = {
+export const apiShow = {
   action: 'show',
   path: '/:id',
   method: 'get',
-} as const
-const apiIndex: ActionDescriptor = {
+} as const satisfies ActionDescriptor
+
+export const apiIndex = {
   action: 'index',
   path: '/',
   method: 'get',
-} as const
+} as const satisfies ActionDescriptor
 
 export function defaultConstructConfig(idSchema: z.AnyZodObject = idNumberSchema): ConstructConfig {
   return {
@@ -101,10 +108,10 @@ function applyOption(actions: readonly ActionDescriptor[], option?: Option) {
   throw new RouterError('Unreachable!')
 }
 
-export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[]): ActionDescriptor[] {
+export function only(actions: readonly ActionName[], sources: readonly ActionDescriptor[]) {
   return sources.filter((ad) => actions.includes(ad.action as ActionName))
 }
 
-export function except(actions: readonly ActionName[], sources: readonly ActionDescriptor[]): ActionDescriptor[] {
+export function except(actions: readonly ActionName[], sources: readonly ActionDescriptor[]) {
   return sources.filter((ad) => !actions.includes(ad.action as ActionName))
 }
