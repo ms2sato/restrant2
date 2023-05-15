@@ -762,10 +762,10 @@ export class ResourceHolderCreateRouter extends BasicRouter {
   constructor(
     private resourcesHolder: Record<string, Resource>,
     fileRoot: string,
-    routerOption: Partial<ServerRouterConfig> = {},
+    serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath = '/'
   ) {
-    super(fileRoot, routerOption, httpPath)
+    super(fileRoot, serverRouterConfig, httpPath)
   }
 
   sub(rpath: string) {
