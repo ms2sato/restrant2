@@ -23,6 +23,7 @@ export type ActionDescriptor = {
   path: string
   method: HttpMethod | readonly HttpMethod[]
   page?: boolean
+  hydrate?: boolean
 }
 
 export type ConstructDescriptor = {
@@ -40,9 +41,14 @@ export type RouteConfig = {
   actions?: readonly ActionDescriptor[]
 }
 
+export type RouterOptions = {
+  hydrate: boolean
+}
+
 export interface Router {
   sub(...args: unknown[]): Router
   resources(path: string, config: RouteConfig): void
+  options(value: RouterOptions): Router
 }
 
 export class RouterError extends Error {}

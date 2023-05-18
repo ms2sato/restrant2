@@ -36,7 +36,7 @@ import {
   choiseSources,
   blankSchema,
 } from '..'
-import { HttpMethod, opt } from './shared'
+import { HttpMethod, RouterOptions, opt } from './shared'
 
 const log = debug('restrant2')
 const routeLog = log.extend('route')
@@ -480,6 +480,8 @@ export abstract class BasicRouter implements Router {
   }
 
   abstract sub(...args: unknown[]): Router
+  abstract options(value: RouterOptions): Router
+
   protected abstract createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner
 
   resources(rpath: string, config: RouteConfig): void {
@@ -570,7 +572,8 @@ export class ServerRouter extends BasicRouter {
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath = '/',
-    readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
+    readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
+    private routerOptions: RouterOptions = { hydrate: false }
   ) {
     super(fileRoot, serverRouterConfig, httpPath, routerCore)
     this.router = express.Router({ mergeParams: true })
@@ -582,11 +585,17 @@ export class ServerRouter extends BasicRouter {
       this.fileRoot,
       this.serverRouterConfig,
       path.join(this.httpPath, rpath),
-      this.routerCore
+      this.routerCore,
+      { ...this.routerOptions }
     )
 
     this.router.use(rpath, ...[...handlers, subRouter.router])
     return subRouter
+  }
+
+  options(value: RouterOptions) {
+    this.routerOptions = value
+    return this
   }
 
   namedResources(): NamedResources {
@@ -622,6 +631,10 @@ export class ServerRouter extends BasicRouter {
       const actionDescriptors: readonly ActionDescriptor[] = routeConfig.actions || this.serverRouterConfig.actions
 
       for (const actionDescriptor of actionDescriptors) {
+        if (actionDescriptor.hydrate === undefined) {
+          actionDescriptor.hydrate = this.routerOptions.hydrate
+        }
+
         const actionName = actionDescriptor.action
         const resourceHttpPath = this.getHttpPath(rpath)
 
@@ -727,12 +740,13 @@ export class ServerRouter extends BasicRouter {
 
         const urlPath = path.join(rpath, actionDescriptor.path)
         routeLog(
-          '%s %s\t%s\t{actionOverride:%s, resourceMethod:%s}',
+          '%s %s\t%s\t{actionOverride:%s, resourceMethod:%s, descriptor: %s}',
           actionDescriptor.method instanceof Array ? actionDescriptor.method.join(',') : actionDescriptor.method,
           path.join(this.httpPath, urlPath),
           actionName,
           actionOverride,
-          !!resourceMethod
+          !!resourceMethod,
+          actionDescriptor
         )
 
         const urlPathWithExt = `${urlPath.replace(/\/$/, '')}.:format?`
@@ -763,7 +777,8 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     private resourcesHolder: Record<string, Resource>,
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
-    httpPath = '/'
+    httpPath = '/',
+    private routerOptions: RouterOptions = { hydrate: false }
   ) {
     super(fileRoot, serverRouterConfig, httpPath)
   }
@@ -774,8 +789,14 @@ export class ResourceHolderCreateRouter extends BasicRouter {
       this.resourcesHolder,
       this.fileRoot,
       this.serverRouterConfig,
-      path.join(this.httpPath, rpath)
+      path.join(this.httpPath, rpath),
+      { ...this.routerOptions }
     )
+  }
+
+  options(value: RouterOptions) {
+    this.routerOptions = value
+    return this
   }
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
