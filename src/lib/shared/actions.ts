@@ -2,59 +2,59 @@ import { ActionDescriptor, blankSchema, ConstructConfig, idNumberSchema, RouterE
 
 export type ActionName = 'build' | 'edit' | 'show' | 'index' | 'create' | 'update' | 'destroy'
 
-export const build = {
+const build = {
   action: 'build',
   path: '/build',
   method: 'get',
   page: true,
 } as const satisfies ActionDescriptor
 
-export const edit = {
+const edit = {
   action: 'edit',
   path: '/:id/edit',
   method: 'get',
   page: true,
 } as const satisfies ActionDescriptor
 
-export const show = {
+const show = {
   action: 'show',
   path: '/:id',
   method: 'get',
   page: true,
 } as const satisfies ActionDescriptor
 
-export const index = {
+const index = {
   action: 'index',
   path: '/',
   method: 'get',
   page: true,
 } as const satisfies ActionDescriptor
 
-export const create = {
+const create = {
   action: 'create',
   path: '/',
   method: 'post',
 } as const satisfies ActionDescriptor
 
-export const update = {
+const update = {
   action: 'update',
   path: '/:id',
   method: ['put', 'patch'],
 } as const satisfies ActionDescriptor
 
-export const destroy = {
+const destroy = {
   action: 'destroy',
   path: '/:id',
   method: 'delete',
 } as const satisfies ActionDescriptor
 
-export const apiShow = {
+const apiShow = {
   action: 'show',
   path: '/:id',
   method: 'get',
 } as const satisfies ActionDescriptor
 
-export const apiIndex = {
+const apiIndex = {
   action: 'index',
   path: '/',
   method: 'get',
@@ -82,13 +82,15 @@ export type Option =
       only?: undefined
     }
 
+const standardActions = [build, edit, show, index, create, update, destroy]
 export function standard(option?: Option): readonly ActionDescriptor[] {
-  const actions = [build, edit, show, index, create, update, destroy]
+  const actions = standardActions.map((action) => ({ ...action }))
   return applyOption(actions, option)
 }
 
+const apiActions = [apiShow, apiIndex, create, update, destroy]
 export function api(option?: Option): readonly ActionDescriptor[] {
-  const actions = [apiShow, apiIndex, create, update, destroy]
+  const actions = apiActions.map((action) => ({ ...action }))
   return applyOption(actions, option)
 }
 
