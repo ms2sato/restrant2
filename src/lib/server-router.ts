@@ -351,9 +351,28 @@ export const importAndSetup = async <S, R>(
   try {
     ret = (await import(fullPath)) as { default: EndpointFunc<S, R> }
   } catch (err) {
-    if (isImportError(err) && err.code === 'MODULE_NOT_FOUND') {
-      routeLog.extend('debug')('%s not found', fullPath)
-      return {} as R
+    if (process.env.NODE_ENV !== 'production' && isImportError(err) && err.code === 'MODULE_NOT_FOUND') {
+      let tsFullPath
+      // try '.ts' for dev
+      if (fullPath.endsWith('.js')) {
+        tsFullPath = fullPath.slice(0, -3) + '.ts'
+      } else if (!fullPath.endsWith('.ts')) {
+        tsFullPath = fullPath + '.ts'
+      } else {
+        routeLog.extend('debug')('%s not found', fullPath)
+        return {} as R
+      }
+
+      try {
+        ret = (await import(tsFullPath)) as { default: EndpointFunc<S, R> }
+      } catch (err) {
+        if (isImportError(err) && err.code === 'MODULE_NOT_FOUND') {
+          routeLog.extend('debug')('%s not found', fullPath)
+          return {} as R
+        } else {
+          throw err
+        }
+      }
     } else {
       throw err
     }
