@@ -35,6 +35,7 @@ import {
   choiceSchema,
   choiseSources,
   blankSchema,
+  PartialWithRequired,
 } from '..'
 import { HttpMethod, RouterOptions, opt } from './shared'
 
@@ -67,6 +68,7 @@ export type ResourceMethodHandlerParams = {
 }
 
 export type ServerRouterConfig = {
+  baseDir: string
   actions: readonly ActionDescriptor[]
   inputArranger: InputArranger
   createActionOptions: CreateActionOptionFunction
@@ -96,6 +98,8 @@ export type ContentArranger = {
 }
 
 type ContentType2Arranger = Record<string, ContentArranger>
+
+type ServerRouterConfigCustom = PartialWithRequired<ServerRouterConfig, 'baseDir'>
 
 export const defaultContentType2Arranger: ContentType2Arranger = {
   'application/json': arrangeJsonInput,
@@ -465,7 +469,7 @@ export class ActionContextImpl implements MutableActionContext {
   }
 }
 
-export function defaultServerRouterConfig(): ServerRouterConfig {
+function defaultServerRouterConfig(): Omit<ServerRouterConfig, 'baseDir'> {
   return {
     actions: Actions.standard(),
     inputArranger: createSmartInputArranger(),
@@ -481,6 +485,10 @@ export function defaultServerRouterConfig(): ServerRouterConfig {
   }
 }
 
+export function fillServerRouterConfig(serverRouterConfig: ServerRouterConfigCustom): ServerRouterConfig {
+  return Object.assign(defaultServerRouterConfig(), serverRouterConfig)
+}
+
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
   nameToResource: Map<string, Resource>
@@ -491,11 +499,11 @@ export abstract class BasicRouter implements Router {
 
   constructor(
     readonly fileRoot: string,
-    serverRouterConfig: Partial<ServerRouterConfig> = {},
+    serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     readonly httpPath: string = '/',
     protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
   ) {
-    this.serverRouterConfig = Object.assign(defaultServerRouterConfig(), serverRouterConfig)
+    this.serverRouterConfig = fillServerRouterConfig(serverRouterConfig)
   }
 
   abstract sub(...args: unknown[]): Router
@@ -589,7 +597,7 @@ export class ServerRouter extends BasicRouter {
 
   constructor(
     fileRoot: string,
-    serverRouterConfig: Partial<ServerRouterConfig> = {},
+    serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     httpPath = '/',
     readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
@@ -795,7 +803,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
   constructor(
     private resourcesHolder: Record<string, Resource>,
     fileRoot: string,
-    serverRouterConfig: Partial<ServerRouterConfig> = {},
+    serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     httpPath = '/',
     protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
