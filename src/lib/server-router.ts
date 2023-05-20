@@ -778,9 +778,10 @@ export class ResourceHolderCreateRouter extends BasicRouter {
     fileRoot: string,
     serverRouterConfig: Partial<ServerRouterConfig> = {},
     httpPath = '/',
+    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
   ) {
-    super(fileRoot, serverRouterConfig, httpPath)
+    super(fileRoot, serverRouterConfig, httpPath, routerCore)
   }
 
   sub(rpath: string) {
@@ -790,6 +791,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
       this.fileRoot,
       this.serverRouterConfig,
       path.join(this.httpPath, rpath),
+      this.routerCore,
       { ...this.routerOptions }
     )
   }
@@ -800,6 +802,7 @@ export class ResourceHolderCreateRouter extends BasicRouter {
   }
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
+    holderLog('createHandlerBuildRunner: %s', rpath)
     return async () => {
       holderLog('%s', rpath)
       const resourcePath = this.getResourcePath(rpath)
