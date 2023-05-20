@@ -491,6 +491,7 @@ export function fillServerRouterConfig(serverRouterConfig: ServerRouterConfigCus
 export type RouterCore = {
   handlerBuildRunners: HandlerBuildRunner[]
   nameToResource: Map<string, Resource>
+  nameToPath: Map<string, string>
 }
 
 export abstract class BasicRouter implements Router {
@@ -499,7 +500,11 @@ export abstract class BasicRouter implements Router {
   constructor(
     serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     readonly httpPath: string = '/',
-    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
+    protected readonly routerCore: RouterCore = {
+      handlerBuildRunners: [],
+      nameToResource: new Map(),
+      nameToPath: new Map(),
+    }
   ) {
     this.serverRouterConfig = fillServerRouterConfig(serverRouterConfig)
   }
@@ -596,7 +601,7 @@ export class ServerRouter extends BasicRouter {
   constructor(
     serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     httpPath = '/',
-    readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
+    readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map(), nameToPath: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
   ) {
     super(serverRouterConfig, httpPath, routerCore)
@@ -637,9 +642,14 @@ export class ServerRouter extends BasicRouter {
 
       const resourceName = routeConfig.name
       if (this.routerCore.nameToResource.get(resourceName)) {
-        throw new Error(`Duplicated Resource Name: ${resourceName}`)
+        throw new Error(
+          `Duplicated Resource Name: ${resourceName}; path: ${resourcePath}, with: ${
+            this.routerCore.nameToPath.get(resourceName) ?? 'unknown'
+          }`
+        )
       }
       this.routerCore.nameToResource.set(resourceName, createLocalResourceProxy(routeConfig, resource))
+      this.routerCore.nameToPath.set(resourceName, resourcePath)
 
       const adapterPath = this.getAdapterPath(rpath)
       const adapter: Adapter = await importAndSetup<ActionSupport, Adapter>(
