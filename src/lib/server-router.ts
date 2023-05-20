@@ -99,7 +99,7 @@ export type ContentArranger = {
 
 type ContentType2Arranger = Record<string, ContentArranger>
 
-type ServerRouterConfigCustom = PartialWithRequired<ServerRouterConfig, 'baseDir'>
+export type ServerRouterConfigCustom = PartialWithRequired<ServerRouterConfig, 'baseDir'>
 
 export const defaultContentType2Arranger: ContentType2Arranger = {
   'application/json': arrangeJsonInput,
