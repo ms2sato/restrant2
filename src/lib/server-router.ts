@@ -42,7 +42,6 @@ import { HttpMethod, RouterOptions, opt } from './shared'
 const log = debug('restrant2')
 const routeLog = log.extend('route')
 const handlerLog = log.extend('handler')
-const holderLog = log.extend('holder')
 
 export type ActionContextProps = {
   router: ServerRouter
@@ -541,7 +540,7 @@ export abstract class BasicRouter implements Router {
   }
 }
 
-const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Resource => {
+export const createLocalResourceProxy = (config: RouteConfig, resource: Resource): Resource => {
   const resourceProxy: Resource = {}
   for (const actionName in resource) {
     const resourceMethod = resource[actionName]
@@ -790,48 +789,6 @@ export class ServerRouter extends BasicRouter {
           }
         }
       }
-    }
-  }
-}
-
-export class ResourceHolderCreateRouter extends BasicRouter {
-  constructor(
-    private resourcesHolder: Record<string, Resource>,
-    serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
-    httpPath = '/',
-    protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
-    private routerOptions: RouterOptions = { hydrate: false }
-  ) {
-    super(serverRouterConfig, httpPath, routerCore)
-  }
-
-  sub(rpath: string) {
-    holderLog('sub: %s', rpath)
-    return new ResourceHolderCreateRouter(
-      this.resourcesHolder,
-      this.serverRouterConfig,
-      path.join(this.httpPath, rpath),
-      this.routerCore,
-      { ...this.routerOptions }
-    )
-  }
-
-  options(value: RouterOptions) {
-    this.routerOptions = value
-    return this
-  }
-
-  protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
-    holderLog('createHandlerBuildRunner: %s', rpath)
-    const fileRoot = this.serverRouterConfig.baseDir
-    return async () => {
-      holderLog('%s', rpath)
-      const resourcePath = this.getResourcePath(rpath)
-      const resourceSupport = new ResourceSupport(fileRoot)
-      const resource = await importAndSetup<ResourceSupport, Resource>(fileRoot, resourcePath, resourceSupport, config)
-
-      const resourceProxy = createLocalResourceProxy(config, resource)
-      this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
     }
   }
 }
