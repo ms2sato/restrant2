@@ -498,7 +498,6 @@ export abstract class BasicRouter implements Router {
   readonly serverRouterConfig: ServerRouterConfig
 
   constructor(
-    readonly fileRoot: string,
     serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     readonly httpPath: string = '/',
     protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() }
@@ -596,25 +595,20 @@ export class ServerRouter extends BasicRouter {
   readonly router: express.Router
 
   constructor(
-    fileRoot: string,
     serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     httpPath = '/',
     readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
   ) {
-    super(fileRoot, serverRouterConfig, httpPath, routerCore)
+    super(serverRouterConfig, httpPath, routerCore)
     this.router = express.Router({ mergeParams: true })
   }
 
   sub(rpath: string, ...handlers: RequestHandler[]) {
     // TODO: impl class SubServerRouter without build
-    const subRouter = new ServerRouter(
-      this.fileRoot,
-      this.serverRouterConfig,
-      path.join(this.httpPath, rpath),
-      this.routerCore,
-      { ...this.routerOptions }
-    )
+    const subRouter = new ServerRouter(this.serverRouterConfig, path.join(this.httpPath, rpath), this.routerCore, {
+      ...this.routerOptions,
+    })
 
     this.router.use(rpath, ...[...handlers, subRouter.router])
     return subRouter
@@ -630,14 +624,15 @@ export class ServerRouter extends BasicRouter {
   }
 
   protected createHandlerBuildRunner(rpath: string, routeConfig: RouteConfig): HandlerBuildRunner {
+    const fileRoot = this.serverRouterConfig.baseDir
     return async () => {
       handlerLog('buildHandler: %s', path.join(this.httpPath, rpath))
 
       const resourcePath = this.getResourcePath(rpath)
       const resource = await importAndSetup<ResourceSupport, Resource>(
-        this.fileRoot,
+        fileRoot,
         resourcePath,
-        new ResourceSupport(this.fileRoot),
+        new ResourceSupport(fileRoot),
         routeConfig
       )
 
@@ -649,9 +644,9 @@ export class ServerRouter extends BasicRouter {
 
       const adapterPath = this.getAdapterPath(rpath)
       const adapter: Adapter = await importAndSetup<ActionSupport, Adapter>(
-        this.fileRoot,
+        fileRoot,
         adapterPath,
-        new ActionSupport(this.fileRoot),
+        new ActionSupport(fileRoot),
         routeConfig
       )
 
@@ -802,20 +797,18 @@ export class ServerRouter extends BasicRouter {
 export class ResourceHolderCreateRouter extends BasicRouter {
   constructor(
     private resourcesHolder: Record<string, Resource>,
-    fileRoot: string,
     serverRouterConfig: ServerRouterConfigCustom = { baseDir: './' },
     httpPath = '/',
     protected readonly routerCore: RouterCore = { handlerBuildRunners: [], nameToResource: new Map() },
     private routerOptions: RouterOptions = { hydrate: false }
   ) {
-    super(fileRoot, serverRouterConfig, httpPath, routerCore)
+    super(serverRouterConfig, httpPath, routerCore)
   }
 
   sub(rpath: string) {
     holderLog('sub: %s', rpath)
     return new ResourceHolderCreateRouter(
       this.resourcesHolder,
-      this.fileRoot,
       this.serverRouterConfig,
       path.join(this.httpPath, rpath),
       this.routerCore,
@@ -830,16 +823,12 @@ export class ResourceHolderCreateRouter extends BasicRouter {
 
   protected createHandlerBuildRunner(rpath: string, config: RouteConfig): HandlerBuildRunner {
     holderLog('createHandlerBuildRunner: %s', rpath)
+    const fileRoot = this.serverRouterConfig.baseDir
     return async () => {
       holderLog('%s', rpath)
       const resourcePath = this.getResourcePath(rpath)
-      const resourceSupport = new ResourceSupport(this.fileRoot)
-      const resource = await importAndSetup<ResourceSupport, Resource>(
-        this.fileRoot,
-        resourcePath,
-        resourceSupport,
-        config
-      )
+      const resourceSupport = new ResourceSupport(fileRoot)
+      const resource = await importAndSetup<ResourceSupport, Resource>(fileRoot, resourcePath, resourceSupport, config)
 
       const resourceProxy = createLocalResourceProxy(config, resource)
       this.resourcesHolder[path.join(this.httpPath, rpath)] = resourceProxy
